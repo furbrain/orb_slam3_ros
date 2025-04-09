@@ -33,6 +33,19 @@ bool save_map_srv(orb_slam3_ros::SaveMap::Request &req, orb_slam3_ros::SaveMap::
     return res.success;
 }
 
+bool save_colmap_srv(orb_slam3_ros::SaveMap::Request &req, orb_slam3_ros::SaveMap::Response &res)
+{
+    res.success = pSLAM->SaveCOLMAP(req.name);
+
+    if (res.success)
+        ROS_INFO("COLMAP was saved as %s.osa", req.name.c_str());
+    else
+        ROS_ERROR("COLMAP could not be saved.");
+
+    return res.success;
+}
+
+
 bool save_traj_srv(orb_slam3_ros::SaveMap::Request &req, orb_slam3_ros::SaveMap::Response &res)
 {
     const string cam_traj_file = req.name + "_cam_traj.txt";
@@ -59,6 +72,7 @@ bool save_traj_srv(orb_slam3_ros::SaveMap::Request &req, orb_slam3_ros::SaveMap:
 void setup_services(ros::NodeHandle &node_handler, std::string node_name)
 {
     static ros::ServiceServer save_map_service = node_handler.advertiseService(node_name + "/save_map", save_map_srv);
+    static ros::ServiceServer save_colmap_service = node_handler.advertiseService(node_name + "/save_colmap", save_colmap_srv);
     static ros::ServiceServer save_traj_service = node_handler.advertiseService(node_name + "/save_traj", save_traj_srv);
 }
 

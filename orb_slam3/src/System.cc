@@ -32,6 +32,7 @@
 #include <boost/archive/binary_oarchive.hpp>
 #include <boost/archive/xml_iarchive.hpp>
 #include <boost/archive/xml_oarchive.hpp>
+#include <boost/filesystem.hpp>
 
 namespace ORB_SLAM3
 {
@@ -1611,10 +1612,97 @@ bool System::SaveMap(const string &filename)
     if(!mStrSaveAtlasToFile.empty())
     {
         Verbose::PrintMess("Atlas saving to file " + mStrSaveAtlasToFile, Verbose::VERBOSITY_NORMAL);
-        return SaveAtlas(FileType::BINARY_FILE);
+        return SaveAtlas(FileType::TEXT_FILE);
     }
     return false;
 }
 
+bool System::SaveCOLMAP(const string &path)
+{
+  // prepare directories
+  Verbose::PrintMess("COLMAP saving to directory " + mStrSaveAtlasToFile, Verbose::VERBOSITY_NORMAL);
+  const boost::filesystem::path pth = path;
+  boost::filesystem::create_directories(pth / "sparse");
+  boost::filesystem::create_directories(pth / "images");
+
+  //prepare data
+  mpAtlas->PreSave();
+  vector<Map*> vpMaps = mpAtlas->GetAllMaps();
+  int numMaxKFs = 0;
+  Map* pBiggerMap;
+  std::cout << "There are " << std::to_string(vpMaps.size()) << " maps in the atlas" << std::endl;
+  for(Map* pMap :vpMaps)
+  {
+      std::cout << "  Map " << std::to_string(pMap->GetId()) << " has " << std::to_string(pMap->GetAllKeyFrames().size()) << " KFs" << std::endl;
+      if(pMap->GetAllKeyFrames().size() > numMaxKFs)
+      {
+          numMaxKFs = pMap->GetAllKeyFrames().size();
+          pBiggerMap = pMap;
+      }
+  }
+
+  // create cameras.txt
+  boost::filesystem::ofstream f_camera;
+  const boost::filesystem::path camera_fname = pth / "sparse" / "cameras.txt";
+  std::cout << "  Writing to " << image_fname << std::endl;
+  f_camera.open(camera_fname);
+  std::cout << "  file opened: " << image_fname << std::endl;
+
+  std::vector<GeometricCamera*> = mpAtlas->GetAllCameras();
+
+
+  f_camera.close();
+
+  // create images.txt
+  boost::filesystem::ofstream f_images;
+  const boost::filesystem::path image_fname = pth / "sparse" / "images.txt";
+  std::cout << "  Writing to " << image_fname << std::endl;
+  f_images.open(image_fname);
+  std::cout << "  file opened: " << image_fname << std::endl;
+
+  vector<KeyFrame*> vpKFs = pBiggerMap->GetAllKeyFrames();
+  vector<MapPoint*> allMapPoints = pBiggerMap->GetAllMapPoints();
+  for(KeyFrame* pKF: vpKFs)
+  {
+    Sophus::SE3f Twb = pKF->GetPose();
+    Eigen::Quaternionf q = Twb.unit_quaternion();
+    Eigen::Vector3f twb = Twb.translation();
+    long long ts = 1e9*pKF->mTimeStamp;
+    f_images <<  pKF->mnId  << " " <<  setprecision(9) << q.w() << " " << q.x() << " " << q.y() << " " << q.z() << " " << twb(0) << " " << twb(1) << " " << twb(2) << " 1 " << ts << ".png" << std::endl;
+    std::cout << "processing KP " << ts << ", num_keys" << pKF->mvKeys.size() << ", num_mappoints: " << pKF->GetMapPointMatches().size() << std::endl;
+    for (size_t i=0; i < pKF->mvKeys.size(); i++) {
+      cv::KeyPoint kp = pKF->mvKeys[i];
+      auto mp = pKF->GetMapPoint(i);
+      int mp_id = -1;
+      if (mp)
+        mp_id = mp->mnId;
+      f_images << kp.pt.x << " " << kp.pt.y << " " << mp_id << " ";
+    }
+    f_images << std::endl;
+  }
+  f_images.close();
+
+  // create points3D.txt
+  boost::filesystem::ofstream f_points;
+  const boost::filesystem::path points_fname = pth / "sparse" / "points3D.txt";
+  std::cout << "  Writing to " << points_fname << std::endl;
+  f_points.open(points_fname);
+  std::cout << "  file opened: " << points_fname << std::endl;
+
+  for (MapPoint* mp: allMapPoints)
+  {
+    auto worldPos = mp->GetWorldPos();
+    f_points << mp->mnId << " " << worldPos(0) << " " << worldPos(1) << " " << worldPos(2) << " 255 0 0 0";
+    auto obs = mp->GetObservations();
+    for (auto const& x: obs)
+    {
+      int idx = get<0>(x.second); // only record left camera readings for now
+      if (idx >= 0)
+        f_points << " " << x.first->mnId << " " << idx;
+    }
+    f_points << std::endl;
+  }
+  return true;
+}
 } //namespace ORB_SLAM
 
