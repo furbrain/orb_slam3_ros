@@ -56,6 +56,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
+#include "opencv2/core/ocl.hpp"
 #include <vector>
 #include <iostream>
 
@@ -76,7 +77,6 @@ namespace ORB_SLAM3
     static float IC_Angle(const Mat& image, Point2f pt,  const vector<int> & u_max)
     {
         int m_01 = 0, m_10 = 0;
-
         const uchar* center = &image.at<uchar> (cvRound(pt.y), cvRound(pt.x));
 
         // Treat the center line differently, v=0
@@ -411,6 +411,9 @@ namespace ORB_SLAM3
             nfeatures(_nfeatures), scaleFactor(_scaleFactor), nlevels(_nlevels),
             iniThFAST(_iniThFAST), minThFAST(_minThFAST)
     {
+        ocl::setUseOpenCL(true);
+        mpORB = cv::ORB::create(_nfeatures, _scaleFactor, _nlevels);
+        mpORB->setFastThreshold(_iniThFAST);
         mvScaleFactor.resize(nlevels);
         mvLevelSigma2.resize(nlevels);
         mvScaleFactor[0]=1.0f;
@@ -468,12 +471,13 @@ namespace ORB_SLAM3
         }
     }
 
-    static void computeOrientation(const Mat& image, vector<KeyPoint>& keypoints, const vector<int>& umax)
+    static void computeOrientation(const UMat& image, vector<KeyPoint>& keypoints, const vector<int>& umax)
     {
+        Mat img = image.getMat(ACCESS_READ);
         for (vector<KeyPoint>::iterator keypoint = keypoints.begin(),
                      keypointEnd = keypoints.end(); keypoint != keypointEnd; ++keypoint)
         {
-            keypoint->angle = IC_Angle(image, keypoint->pt, umax);
+            keypoint->angle = IC_Angle(img, keypoint->pt, umax);
         }
     }
 
@@ -971,7 +975,7 @@ namespace ORB_SLAM3
                     }
 
 
-                    Mat cellImage = mvImagePyramid[level].rowRange(iniY,iniY+hY).colRange(iniX,iniX+hX);
+                    UMat cellImage = mvImagePyramid[level].rowRange(iniY,iniY+hY).colRange(iniX,iniX+hX);
 
                     cellKeyPoints[i][j].reserve(nfeaturesCell*5);
 
@@ -1074,13 +1078,14 @@ namespace ORB_SLAM3
             computeOrientation(mvImagePyramid[level], allKeypoints[level], umax);
     }
 
-    static void computeDescriptors(const Mat& image, vector<KeyPoint>& keypoints, Mat& descriptors,
+    static void computeDescriptors(const UMat& image, vector<KeyPoint>& keypoints, Mat& descriptors,
                                    const vector<Point>& pattern)
     {
         descriptors = Mat::zeros((int)keypoints.size(), 32, CV_8UC1);
+        Mat img = image.getMat(ACCESS_READ);
 
         for (size_t i = 0; i < keypoints.size(); i++)
-            computeOrbDescriptor(keypoints[i], image, &pattern[0], descriptors.ptr((int)i));
+            computeOrbDescriptor(keypoints[i], img, &pattern[0], descriptors.ptr((int)i));
     }
 
     int ORBextractor::operator()( InputArray _image, InputArray _mask, vector<KeyPoint>& _keypoints,
@@ -1090,7 +1095,10 @@ namespace ORB_SLAM3
         if(_image.empty())
             return -1;
 
-        Mat image = _image.getMat();
+        UMat image = _image.getUMat();
+        mpORB->detectAndCompute(image, _mask, _keypoints, _descriptors);
+        return _keypoints.size();
+
         assert(image.type() == CV_8UC1 );
 
         // Pre-compute the scale pyramid
@@ -1129,7 +1137,7 @@ namespace ORB_SLAM3
                 continue;
 
             // preprocess the resized image
-            Mat workingMat = mvImagePyramid[level].clone();
+            UMat workingMat = mvImagePyramid[level].clone();
             GaussianBlur(workingMat, workingMat, Size(7, 7), 2, 2, BORDER_REFLECT_101);
 
             // Compute the descriptors
@@ -1163,18 +1171,19 @@ namespace ORB_SLAM3
                 i++;
             }
         }
+        //export descriptors...
         //cout << "[ORBextractor]: extracted " << _keypoints.size() << " KeyPoints" << endl;
         return monoIndex;
     }
 
-    void ORBextractor::ComputePyramid(cv::Mat image)
+    void ORBextractor::ComputePyramid(cv::UMat image)
     {
         for (int level = 0; level < nlevels; ++level)
         {
             float scale = mvInvScaleFactor[level];
             Size sz(cvRound((float)image.cols*scale), cvRound((float)image.rows*scale));
             Size wholeSize(sz.width + EDGE_THRESHOLD*2, sz.height + EDGE_THRESHOLD*2);
-            Mat temp(wholeSize, image.type()), masktemp;
+            UMat temp(wholeSize, image.type()), masktemp;
             mvImagePyramid[level] = temp(Rect(EDGE_THRESHOLD, EDGE_THRESHOLD, sz.width, sz.height));
 
             // Compute the resized image
