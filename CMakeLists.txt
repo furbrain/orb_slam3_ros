@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.5)
 project(orb_slam3_ros)
 
 IF(NOT CMAKE_BUILD_TYPE)
@@ -64,9 +64,19 @@ add_service_files(
   SaveMap.srv
 )
 
+add_message_files(
+  FILES
+  Atlas.msg
+  Map.msg
+  KeyFrame.msg
+  KeyPoint.msg
+  Point3D.msg
+)
+
 generate_messages(
   DEPENDENCIES
   std_msgs
+  geometry_msgs
 )
 
 catkin_package (

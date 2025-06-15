@@ -218,7 +218,7 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     }
 
     // Fix verbosity
-    Verbose::SetTh(Verbose::VERBOSITY_QUIET);
+    Verbose::SetTh(Verbose::VERBOSITY_NORMAL);
 
 }
 
@@ -1309,6 +1309,11 @@ int System::GetTrackingState()
     return mTrackingState;
 }
 
+bool System::GetLastFrameIsKF()
+{
+    return mpTracker->mbLastFrameIsKF;
+}
+
 vector<MapPoint*> System::GetTrackedMapPoints()
 {
     unique_lock<mutex> lock(mMutexState);
@@ -1606,6 +1611,11 @@ vector<Sophus::SE3f> System::GetAllKeyframePoses()
     return vKFposes;
 }
 
+Atlas* System::GetAtlas()
+{
+    return mpAtlas;
+}
+
 bool System::SaveMap(const string &filename)
 {
     mStrSaveAtlasToFile = filename;
@@ -1644,11 +1654,11 @@ bool System::SaveCOLMAP(const string &path)
   // create cameras.txt
   boost::filesystem::ofstream f_camera;
   const boost::filesystem::path camera_fname = pth / "sparse" / "cameras.txt";
-  std::cout << "  Writing to " << image_fname << std::endl;
+  std::cout << "  Writing to " << camera_fname << std::endl;
   f_camera.open(camera_fname);
-  std::cout << "  file opened: " << image_fname << std::endl;
+  std::cout << "  file opened: " << camera_fname << std::endl;
 
-  std::vector<GeometricCamera*> = mpAtlas->GetAllCameras();
+  //std::vector<GeometricCamera*> cams = mpAtlas->GetAllCameras();
 
 
   f_camera.close();

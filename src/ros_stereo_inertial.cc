@@ -213,7 +213,11 @@ void ImageGrabber::SyncWithImu()
             Sophus::SE3f Tcw = pSLAM->TrackStereo(imLeft,imRight,tImLeft,vImuMeas);
 
             publish_topics(msg_time, Wbb);
-            
+            if (pSLAM->GetLastFrameIsKF()) 
+            {
+                publish_atlas(pSLAM->GetAtlas(), msg_time);
+                publish_kf(imLeft, msg_time);
+            }
             std::chrono::milliseconds tSleep(1);
             std::this_thread::sleep_for(tSleep);
         }

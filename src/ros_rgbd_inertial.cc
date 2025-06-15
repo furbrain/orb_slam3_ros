@@ -26,10 +26,12 @@ public:
     void GrabRGBD(const sensor_msgs::ImageConstPtr& msgRGB, const sensor_msgs::ImageConstPtr& msgD);
     cv::Mat GetImage(const sensor_msgs::ImageConstPtr &img_msg);
     void SyncWithImu();
-
+    void ShowStats();
     queue<sensor_msgs::ImageConstPtr> imgRGBBuf, imgDBuf;
     std::mutex mBufMutex;
     ImuGrabber *mpImuGb;
+private:
+    unsigned int mframeCount = 0;
 };
 
 
@@ -103,15 +105,23 @@ void ImageGrabber::GrabRGBD(const sensor_msgs::ImageConstPtr& msgRGB,const senso
 {
     mBufMutex.lock();
 
-    if (!imgRGBBuf.empty())
+    if (imgRGBBuf.size()>5)
         imgRGBBuf.pop();
     imgRGBBuf.push(msgRGB);
 
-    if (!imgDBuf.empty())
+    if (imgDBuf.size()>5)
         imgDBuf.pop();
     imgDBuf.push(msgD);
 
     mBufMutex.unlock();
+}
+
+void ImageGrabber::ShowStats()
+{
+
+    mBufMutex.lock();
+    mBufMutex.unlock();
+
 }
 
 cv::Mat ImageGrabber::GetImage(const sensor_msgs::ImageConstPtr &img_msg)
@@ -179,6 +189,16 @@ void ImageGrabber::SyncWithImu()
             Sophus::SE3f Tcw = pSLAM->TrackRGBD(im, depth, tIm, vImuMeas);
             
             publish_topics(msg_time, Wbb);
+            if (mframeCount++ % 20 == 0) 
+            {
+                publish_atlas(pSLAM->GetAtlas(), msg_time);
+            }
+
+            //if (pSLAM->GetLastFrameIsKF()) 
+            //{
+            //    publish_atlas(pSLAM->GetAtlas(), msg_time);
+            //    publish_kf(im, msg_time);
+            //}
         }
 
         std::chrono::milliseconds tSleep(1);

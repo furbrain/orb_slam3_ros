@@ -5,7 +5,7 @@
 */
 
 #include "common.h"
-
+#include "System.h"
 using namespace std;
 
 class ImageGrabber
@@ -14,6 +14,8 @@ public:
     ImageGrabber(){};
 
     void GrabRGBD(const sensor_msgs::ImageConstPtr& msgRGB,const sensor_msgs::ImageConstPtr& msgD);
+private:
+    unsigned int mframeCount = 0;
 };
 
 int main(int argc, char **argv)
@@ -106,4 +108,8 @@ void ImageGrabber::GrabRGBD(const sensor_msgs::ImageConstPtr& msgRGB,const senso
     ros::Time msg_time = cv_ptrRGB->header.stamp;
 
     publish_topics(msg_time);
+    if (mframeCount++ % 20 == 0) 
+    {
+        publish_atlas(pSLAM->GetAtlas(), msg_time);
+    }
 }

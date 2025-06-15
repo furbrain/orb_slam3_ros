@@ -182,6 +182,8 @@ public:
     std::vector<MapPoint*> GetAllMapPoints();
     std::vector<Sophus::SE3f> GetAllKeyframePoses();
     cv::Mat GetCurrentFrame();
+    bool GetLastFrameIsKF();
+    Atlas* GetAtlas();
 
     Sophus::SE3f GetCamTwc();
     Sophus::SE3f GetImuTwb();
@@ -274,6 +276,7 @@ private:
     string mStrVocabularyFilePath;
 
     Settings* settings_;
+
 };
 
 }// namespace ORB_SLAM

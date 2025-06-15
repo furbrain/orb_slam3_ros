@@ -3,7 +3,10 @@
 * Common functions and variables across all modes (mono/stereo, with or w/o imu)
 *
 */
+#include <orb_slam3_ros/Atlas.h> // This file is created automatically, see here http://wiki.ros.org/ROS/Tutorials/CreatingMsgAndSrv#Creating_a_srv
 
+#include "MapPoint.h"
+#include "System.h"
 #include "common.h"
 
 // Variables for ORB-SLAM3
@@ -14,8 +17,8 @@ ORB_SLAM3::System::eSensor sensor_type = ORB_SLAM3::System::NOT_SET;
 std::string world_frame_id, cam_frame_id, imu_frame_id;
 ros::Publisher pose_pub, odom_pub, kf_markers_pub;
 ros::Publisher tracked_mappoints_pub, all_mappoints_pub;
-ros::Publisher tracked_keypoints_pub;
-image_transport::Publisher tracking_img_pub;
+ros::Publisher tracked_keypoints_pub, atlas_pub;
+image_transport::Publisher tracking_img_pub, kf_pub;
 
 //////////////////////////////////////////////////
 // Main functions
@@ -89,6 +92,10 @@ void setup_publishers(ros::NodeHandle &node_handler, image_transport::ImageTrans
     tracking_img_pub = image_transport.advertise(node_name + "/tracking_image", 1);
 
     kf_markers_pub = node_handler.advertise<visualization_msgs::Marker>(node_name + "/kf_markers", 1000);
+
+    kf_pub = image_transport.advertise(node_name + "/keyframes", 1);
+
+    atlas_pub = node_handler.advertise<orb_slam3_ros::Atlas>(node_name + "/atlas", 3);
 
     if (sensor_type == ORB_SLAM3::System::IMU_MONOCULAR || sensor_type == ORB_SLAM3::System::IMU_STEREO || sensor_type == ORB_SLAM3::System::IMU_RGBD)
     {
@@ -278,7 +285,77 @@ void publish_kf_markers(std::vector<Sophus::SE3f> vKFposes, ros::Time msg_time)
     }
     
     kf_markers_pub.publish(kf_markers);
+    
 }
+
+void publish_kf(cv::Mat image, ros::Time msg_time)
+{
+    std_msgs::Header header;
+    header.stamp = msg_time;
+    header.frame_id = world_frame_id;
+    const sensor_msgs::ImagePtr rendered_image_msg = cv_bridge::CvImage(header, "bgr8", image).toImageMsg();
+    kf_pub.publish(rendered_image_msg);
+}
+
+
+void publish_atlas(ORB_SLAM3::Atlas* atlas, ros::Time msg_time)
+{
+    std_msgs::Header header;
+    header.stamp = msg_time;
+    header.frame_id = world_frame_id;
+
+    orb_slam3_ros::Atlas atlas_msg;
+    atlas_msg.header = header;
+    auto vpMaps = atlas->GetAllMaps();
+    std::set<decltype(ORB_SLAM3::MapPoint::mnId)> sPoints;
+    for(ORB_SLAM3::Map* pMap :vpMaps)
+    {
+        orb_slam3_ros::Map map_msg;
+        for(ORB_SLAM3::KeyFrame* pKF: pMap->GetAllKeyFrames()) 
+        {
+            orb_slam3_ros::KeyFrame kf_msg;
+            Sophus::SE3f Twb = pKF->GetPose();
+            Eigen::Quaternionf q = Twb.unit_quaternion();
+            Sophus::Vector3f tr = Twb.translation();
+            kf_msg.id = pKF->mnId;
+            kf_msg.stamp = ros::Time(pKF->mTimeStamp);
+            kf_msg.pose.orientation.w = q.w();
+            kf_msg.pose.orientation.x = q.x();
+            kf_msg.pose.orientation.y = q.y();
+            kf_msg.pose.orientation.z = q.z();
+            kf_msg.pose.position.x = tr.x();
+            kf_msg.pose.position.y = tr.y();
+            kf_msg.pose.position.z = tr.z();
+            for (size_t i=0; i < pKF->mvKeys.size(); i++) 
+            {
+                cv::KeyPoint kp = pKF->mvKeys[i];
+                orb_slam3_ros::KeyPoint kp_msg;
+                auto mp = pKF->GetMapPoint(i);
+                if (mp)
+                {
+                    kp_msg.point3d_id = mp->mnId;
+                    kp_msg.x = kp.pt.x;
+                    kp_msg.y = kp.pt.y;
+                    kf_msg.points.push_back(kp_msg);
+                    if (sPoints.insert(mp->mnId).second) //insert returns second part true if actually inserted
+                    { // therefore we need to add this point to the main points list
+                        auto pos = mp->GetWorldPos();
+                        orb_slam3_ros::Point3D pt_msg;
+                        pt_msg.x = pos.x();
+                        pt_msg.y = pos.y();
+                        pt_msg.z = pos.z();
+                        pt_msg.id = mp->mnId;
+                        atlas_msg.points.push_back(pt_msg);
+                    }
+                }
+            }
+            map_msg.frames.push_back(kf_msg);
+        }
+        atlas_msg.maps.push_back(map_msg);
+    }
+    atlas_pub.publish(atlas_msg);
+}
+
 
 //////////////////////////////////////////////////
 // Miscellaneous functions

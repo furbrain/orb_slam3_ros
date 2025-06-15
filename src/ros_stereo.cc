@@ -94,6 +94,10 @@ void ImageGrabber::GrabStereo(const sensor_msgs::ImageConstPtr& msgLeft,const se
 
     // ORB-SLAM3 runs in TrackStereo()
     Sophus::SE3f Tcw = pSLAM->TrackStereo(cv_ptrLeft->image, cv_ptrRight->image, msg_time.toSec());
-
+    if (pSLAM->GetLastFrameIsKF()) 
+    {
+        publish_atlas(pSLAM->GetAtlas(), msg_time);
+        publish_kf(cv_ptrLeft->image, msg_time);
+    }
     publish_topics(msg_time);
 }

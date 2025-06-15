@@ -29,9 +29,11 @@
 
 #include <orb_slam3_ros/SaveMap.h> // This file is created automatically, see here http://wiki.ros.org/ROS/Tutorials/CreatingMsgAndSrv#Creating_a_srv
 
+
 // ORB-SLAM3-specific libraries
 #include "System.h"
 #include "ImuTypes.h"
+#include "Atlas.h"
 
 extern ORB_SLAM3::System* pSLAM;
 extern ORB_SLAM3::System::eSensor sensor_type;
@@ -56,6 +58,8 @@ void publish_all_points(std::vector<ORB_SLAM3::MapPoint*>, ros::Time);
 void publish_tf_transform(Sophus::SE3f, string, string, ros::Time);
 void publish_body_odom(Sophus::SE3f, Eigen::Vector3f, Eigen::Vector3f, ros::Time);
 void publish_kf_markers(std::vector<Sophus::SE3f>, ros::Time);
+void publish_kf(cv::Mat, ros::Time);
+void publish_atlas(ORB_SLAM3::Atlas*, ros::Time);
 
 bool save_map_srv(orb_slam3_ros::SaveMap::Request&, orb_slam3_ros::SaveMap::Response&);
 bool save_traj_srv(orb_slam3_ros::SaveMap::Request&, orb_slam3_ros::SaveMap::Response&);

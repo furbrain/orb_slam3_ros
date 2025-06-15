@@ -374,6 +374,7 @@ protected:
 
 public:
     cv::Mat mImRight;
+    bool mbLastFrameIsKF;
 };
 
 } //namespace ORB_SLAM
