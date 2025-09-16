@@ -57,7 +57,6 @@ find_package(catkin REQUIRED COMPONENTS
 )
 
 find_package(Eigen3 3.1.0 REQUIRED)
-find_package(Pangolin REQUIRED)
 
 add_service_files(
   FILES
@@ -95,7 +94,6 @@ include_directories(
   ${PROJECT_SOURCE_DIR}/orb_slam3/Thirdparty
   ${PROJECT_SOURCE_DIR}/orb_slam3/Thirdparty/Sophus
   ${EIGEN3_INCLUDE_DIR}
-  ${Pangolin_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS}
 )
 
@@ -117,12 +115,10 @@ add_library(${PROJECT_NAME} SHARED
   orb_slam3/src/KeyFrame.cc
   orb_slam3/src/Atlas.cc
   orb_slam3/src/Map.cc
-  orb_slam3/src/MapDrawer.cc
   orb_slam3/src/Optimizer.cc
   orb_slam3/src/Frame.cc
   orb_slam3/src/KeyFrameDatabase.cc
   orb_slam3/src/Sim3Solver.cc
-  orb_slam3/src/Viewer.cc
   orb_slam3/src/ImuTypes.cc
   orb_slam3/src/G2oTypes.cc
   orb_slam3/src/CameraModels/Pinhole.cpp
@@ -145,12 +141,10 @@ add_library(${PROJECT_NAME} SHARED
   orb_slam3/include/KeyFrame.h
   orb_slam3/include/Atlas.h
   orb_slam3/include/Map.h
-  orb_slam3/include/MapDrawer.h
   orb_slam3/include/Optimizer.h
   orb_slam3/include/Frame.h
   orb_slam3/include/KeyFrameDatabase.h
   orb_slam3/include/Sim3Solver.h
-  orb_slam3/include/Viewer.h
   orb_slam3/include/ImuTypes.h
   orb_slam3/include/G2oTypes.h
   orb_slam3/include/CameraModels/GeometricCamera.h
@@ -168,7 +162,6 @@ add_library(${PROJECT_NAME} SHARED
 target_link_libraries(${PROJECT_NAME}
   ${OpenCV_LIBS}
   ${EIGEN3_LIBS}
-  ${Pangolin_LIBRARIES}
   ${PROJECT_SOURCE_DIR}/orb_slam3/Thirdparty/DBoW2/lib/libDBoW2.so
   ${PROJECT_SOURCE_DIR}/orb_slam3/Thirdparty/g2o/lib/libg2o.so
   -lboost_system
