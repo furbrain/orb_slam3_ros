@@ -5,7 +5,7 @@
 */
 #include <orb_slam3_ros/Atlas.h> // This file is created automatically, see here http://wiki.ros.org/ROS/Tutorials/CreatingMsgAndSrv#Creating_a_srv
 
-#include "MapPoint.h"
+#include "orb_slam3/msg/map_point.h"
 #include "System.h"
 #include "common.h"
 

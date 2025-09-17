@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(orb_slam3_ros)
+project(orb_slam3)
 
 IF(NOT CMAKE_BUILD_TYPE)
   SET(CMAKE_BUILD_TYPE Release)
@@ -7,26 +7,12 @@ ENDIF()
 
 MESSAGE("Build type: " ${CMAKE_BUILD_TYPE})
 
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -Wall   -O3")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall   -O3")
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
-
-# Check C++14 or C++0x support
-include(CheckCXXCompilerFlag)
-CHECK_CXX_COMPILER_FLAG("-std=c++14" COMPILER_SUPPORTS_CXX14)
-CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
-if(COMPILER_SUPPORTS_CXX14)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
-  add_definitions(-DCOMPILEDWITHC11)
-  message(STATUS "Using flag -std=c++14.")
-elseif(COMPILER_SUPPORTS_CXX0X)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
-  add_definitions(-DCOMPILEDWITHC0X)
-  message(STATUS "Using flag -std=c++0x.")
-else()
-  message(FATAL_ERROR "The compiler ${CMAKE_CXX_COMPILER} has no C++14 support. Please use a different C++ compiler.")
-endif()
 
 LIST(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_modules)
 
@@ -37,51 +23,58 @@ endif()
 
 MESSAGE("OPENCV VERSION:")
 MESSAGE(${OpenCV_VERSION})
-
-## Find catkin macros and libraries
-## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
-## is used, also find other catkin packages
-find_package(catkin REQUIRED COMPONENTS
-  cv_bridge
-  image_transport
-  geometry_msgs
-  sensor_msgs
-  nav_msgs
-  std_msgs
-  message_filters
-  roscpp
-  rospy
-  tf
-  tf2
-  message_generation
-)
-
 find_package(Eigen3 3.1.0 REQUIRED)
 
-add_service_files(
-  FILES
-  SaveMap.srv
-)
 
-add_message_files(
-  FILES
-  Atlas.msg
-  Map.msg
-  KeyFrame.msg
-  KeyPoint.msg
-  Point3D.msg
-)
+# ament stuff
+find_package(ament_cmake REQUIRED)
+find_package(cv_bridge REQUIRED)
+find_package(image_transport REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(message_filters REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rclpy REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
 
-generate_messages(
-  DEPENDENCIES
+set(ament_deps
+  cv_bridge
+  image_transport
+  nav_msgs
+  message_filters
+  rclcpp
+  tf2_ros
   std_msgs
   geometry_msgs
+  sensor_msgs
+  visualization_msgs
 )
 
-catkin_package (
-  CATKIN_DEPENDS roscpp rospy std_msgs cv_bridge image_transport tf sensor_msgs dynamic_reconfigure message_runtime
-  LIBRARIES {PROJECT_NAME} libDBoW2 libg2o
+
+set(srv_files
+  srv/SaveMap.srv
 )
+
+set(msg_files
+  msg/Atlas.msg
+  msg/Map.msg
+  msg/KeyFrame.msg
+  msg/KeyPoint.msg
+  msg/Point3D.msg
+)
+
+rosidl_generate_interfaces(${PROJECT_NAME}
+  ${msg_files}
+  ${srv_files}
+  DEPENDENCIES geometry_msgs std_msgs
+)
+
+ament_export_dependencies(rclcpp rclpy std_msgs cv_bridge image_transport tf2 tf2_ros sensor_msgs rosidl_default_runtime)
+ament_export_libraries({PROJECT_NAME} libDBoW2 libg2o)
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
@@ -94,7 +87,6 @@ include_directories(
   ${PROJECT_SOURCE_DIR}/orb_slam3/Thirdparty
   ${PROJECT_SOURCE_DIR}/orb_slam3/Thirdparty/Sophus
   ${EIGEN3_INCLUDE_DIR}
-  ${catkin_INCLUDE_DIRS}
 )
 
 include(${PROJECT_SOURCE_DIR}/orb_slam3/Thirdparty/DBoW2/CMakeLists.txt)
@@ -102,7 +94,7 @@ include(${PROJECT_SOURCE_DIR}/orb_slam3/Thirdparty/g2o/CMakeLists.txt)
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/orb_slam3/lib)
 
-add_library(${PROJECT_NAME} SHARED
+add_library(${PROJECT_NAME}_lib SHARED
   orb_slam3/src/System.cc
   orb_slam3/src/Tracking.cc
   orb_slam3/src/LocalMapping.cc
@@ -159,7 +151,7 @@ add_library(${PROJECT_NAME} SHARED
   orb_slam3/include/Settings.h
 )
 
-target_link_libraries(${PROJECT_NAME}
+target_link_libraries(${PROJECT_NAME}_lib
   ${OpenCV_LIBS}
   ${EIGEN3_LIBS}
   ${PROJECT_SOURCE_DIR}/orb_slam3/Thirdparty/DBoW2/lib/libDBoW2.so
@@ -175,9 +167,11 @@ add_executable(ros_mono
   src/common.cc
 )
 target_link_libraries(ros_mono
-  ${PROJECT_NAME}
-  ${catkin_LIBRARIES}
+  ${PROJECT_NAME}_lib
 )
+
+rosidl_target_interfaces(ros_mono
+  ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 ## ROS node
 add_executable(ros_mono_inertial 
@@ -185,8 +179,7 @@ add_executable(ros_mono_inertial
   src/common.cc
 )
 target_link_libraries(ros_mono_inertial 
-  ${PROJECT_NAME}
-  ${catkin_LIBRARIES}
+  ${PROJECT_NAME}_lib
 )
 
 ## ROS node
@@ -195,8 +188,7 @@ add_executable(ros_stereo
   src/common.cc
 )
 target_link_libraries(ros_stereo
-  ${PROJECT_NAME}
-  ${catkin_LIBRARIES}
+  ${PROJECT_NAME}_lib
 )
 
 ## ROS node
@@ -205,8 +197,7 @@ add_executable(ros_stereo_inertial
   src/common.cc
 )
 target_link_libraries(ros_stereo_inertial 
-  ${PROJECT_NAME}
-  ${catkin_LIBRARIES}
+  ${PROJECT_NAME}_lib
 )
 
 ## ROS node
@@ -215,8 +206,7 @@ add_executable(ros_rgbd
   src/common.cc
 )
 target_link_libraries(ros_rgbd
-  ${PROJECT_NAME}
-  ${catkin_LIBRARIES}
+  ${PROJECT_NAME}_lib
 )
 
 ## ROS node
@@ -225,6 +215,9 @@ add_executable(ros_rgbd_inertial
   src/common.cc
 )
 target_link_libraries(ros_rgbd_inertial
-  ${PROJECT_NAME}
-  ${catkin_LIBRARIES}
+  ${PROJECT_NAME}_lib
 )
+
+ament_target_dependencies(ros_mono ${ament_deps})
+
+ament_package()
