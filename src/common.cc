@@ -3,9 +3,8 @@
 * Common functions and variables across all modes (mono/stereo, with or w/o imu)
 *
 */
-#include <orb_slam3_ros/Atlas.h> // This file is created automatically, see here http://wiki.ros.org/ROS/Tutorials/CreatingMsgAndSrv#Creating_a_srv
+#include <orb_slam3/msg/atlas.hpp> // This file is created automatically, see here http://wiki.ros.org/ROS/Tutorials/CreatingMsgAndSrv#Creating_a_srv
 
-#include "orb_slam3/msg/map_point.h"
 #include "System.h"
 #include "common.h"
 
@@ -15,95 +14,108 @@ ORB_SLAM3::System::eSensor sensor_type = ORB_SLAM3::System::NOT_SET;
 
 // Variables for ROS
 std::string world_frame_id, cam_frame_id, imu_frame_id;
-ros::Publisher pose_pub, odom_pub, kf_markers_pub;
-ros::Publisher tracked_mappoints_pub, all_mappoints_pub;
-ros::Publisher tracked_keypoints_pub, atlas_pub;
+rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_pub;
+rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub;
+rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr kf_markers_pub;
+rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr tracked_mappoints_pub, tracked_keypoints_pub, all_mappoints_pub;
+rclcpp::Publisher<orb_slam3::msg::Atlas>::SharedPtr atlas_pub;
 image_transport::Publisher tracking_img_pub, kf_pub;
+std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster;
 
 //////////////////////////////////////////////////
 // Main functions
 //////////////////////////////////////////////////
 
-bool save_map_srv(orb_slam3_ros::SaveMap::Request &req, orb_slam3_ros::SaveMap::Response &res)
+
+
+void save_map_srv(const std::shared_ptr<orb_slam3::srv::SaveMap::Request> req, std::shared_ptr<orb_slam3::srv::SaveMap::Response> res)
 {
-    res.success = pSLAM->SaveMap(req.name);
+    res->success = pSLAM->SaveMap(req->name);
 
-    if (res.success)
-        ROS_INFO("Map was saved as %s.osa", req.name.c_str());
+    if (res->success)
+        RCLCPP_INFO(rclcpp::get_logger(""),"Map was saved as %s.osa", req->name.c_str());
     else
-        ROS_ERROR("Map could not be saved.");
+        RCLCPP_ERROR(rclcpp::get_logger(""),"Map could not be saved.");
 
-    return res.success;
+    return;
 }
 
-bool save_colmap_srv(orb_slam3_ros::SaveMap::Request &req, orb_slam3_ros::SaveMap::Response &res)
+void save_colmap_srv(const orb_slam3::srv::SaveMap::Request::SharedPtr req, orb_slam3::srv::SaveMap::Response::SharedPtr res)
 {
-    res.success = pSLAM->SaveCOLMAP(req.name);
+    res->success = pSLAM->SaveCOLMAP(req->name);
 
-    if (res.success)
-        ROS_INFO("COLMAP was saved as %s.osa", req.name.c_str());
+    if (res->success)
+        RCLCPP_INFO(rclcpp::get_logger(""), "COLMAP was saved as %s.osa", req->name.c_str());
     else
-        ROS_ERROR("COLMAP could not be saved.");
+        RCLCPP_ERROR(rclcpp::get_logger(""), "COLMAP could not be saved.");
 
-    return res.success;
+    return;
 }
 
 
-bool save_traj_srv(orb_slam3_ros::SaveMap::Request &req, orb_slam3_ros::SaveMap::Response &res)
+void save_traj_srv(const orb_slam3::srv::SaveMap::Request::SharedPtr req, orb_slam3::srv::SaveMap::Response::SharedPtr res)
 {
-    const string cam_traj_file = req.name + "_cam_traj.txt";
-    const string kf_traj_file = req.name + "_kf_traj.txt";
+    const string cam_traj_file = req->name + "_cam_traj.txt";
+    const string kf_traj_file = req->name + "_kf_traj.txt";
 
     try {
         pSLAM->SaveTrajectoryEuRoC(cam_traj_file);
         pSLAM->SaveKeyFrameTrajectoryEuRoC(kf_traj_file);
-        res.success = true;
+        res->success = true;
     } catch (const std::exception &e) {
         std::cerr << e.what() << std::endl;
-        res.success = false;
+        res->success = false;
     } catch (...) {
         std::cerr << "Unknows exeption" << std::endl;
-        res.success = false;
+        res->success = false;
     }
 
-    if (!res.success)
-        ROS_ERROR("Estimated trajectory could not be saved.");
+    if (!res->success)
+        RCLCPP_ERROR(rclcpp::get_logger(""), "Estimated trajectory could not be saved.");
 
-    return res.success;
+    return;
 }
 
-void setup_services(ros::NodeHandle &node_handler, std::string node_name)
+
+
+void setup_services(rclcpp::Node::SharedPtr node, std::string node_name)
 {
-    static ros::ServiceServer save_map_service = node_handler.advertiseService(node_name + "/save_map", save_map_srv);
-    static ros::ServiceServer save_colmap_service = node_handler.advertiseService(node_name + "/save_colmap", save_colmap_srv);
-    static ros::ServiceServer save_traj_service = node_handler.advertiseService(node_name + "/save_traj", save_traj_srv);
+    static rclcpp::Service<orb_slam3::srv::SaveMap>::SharedPtr save_map_service = 
+      node->create_service<orb_slam3::srv::SaveMap>(node_name + "/save_map", &save_map_srv);
+    static rclcpp::Service<orb_slam3::srv::SaveMap>::SharedPtr save_colmap_service = 
+      node->create_service<orb_slam3::srv::SaveMap>(node_name + "/save_colmap", &save_colmap_srv);
+    static rclcpp::Service<orb_slam3::srv::SaveMap>::SharedPtr save_traj_service = 
+      node->create_service<orb_slam3::srv::SaveMap>(node_name + "/save_traj", &save_traj_srv);
 }
 
-void setup_publishers(ros::NodeHandle &node_handler, image_transport::ImageTransport &image_transport, std::string node_name)
+void setup_publishers(rclcpp::Node::SharedPtr node, std::string node_name)
 {
-    pose_pub = node_handler.advertise<geometry_msgs::PoseStamped>(node_name + "/camera_pose", 1);
+    static image_transport::ImageTransport image_transport(node);
+    
+    pose_pub = node->create_publisher<geometry_msgs::msg::PoseStamped>(node_name + "/camera_pose", 1);
 
-    tracked_mappoints_pub = node_handler.advertise<sensor_msgs::PointCloud2>(node_name + "/tracked_points", 1);
+    tracked_mappoints_pub = node->create_publisher<sensor_msgs::msg::PointCloud2>(node_name + "/tracked_points", 1);
 
-    tracked_keypoints_pub = node_handler.advertise<sensor_msgs::PointCloud2>(node_name + "/tracked_key_points", 1);
+    tracked_keypoints_pub = node->create_publisher<sensor_msgs::msg::PointCloud2>(node_name + "/tracked_key_points", 1);
 
-    all_mappoints_pub = node_handler.advertise<sensor_msgs::PointCloud2>(node_name + "/all_points", 1);
+    all_mappoints_pub = node->create_publisher<sensor_msgs::msg::PointCloud2>(node_name + "/all_points", 1);
 
     tracking_img_pub = image_transport.advertise(node_name + "/tracking_image", 1);
 
-    kf_markers_pub = node_handler.advertise<visualization_msgs::Marker>(node_name + "/kf_markers", 1000);
+    kf_markers_pub = node->create_publisher<visualization_msgs::msg::Marker>(node_name + "/kf_markers", 1000);
 
     kf_pub = image_transport.advertise(node_name + "/keyframes", 1);
 
-    atlas_pub = node_handler.advertise<orb_slam3_ros::Atlas>(node_name + "/atlas", 3);
+    atlas_pub = node->create_publisher<orb_slam3::msg::Atlas>(node_name + "/atlas", 3);
 
     if (sensor_type == ORB_SLAM3::System::IMU_MONOCULAR || sensor_type == ORB_SLAM3::System::IMU_STEREO || sensor_type == ORB_SLAM3::System::IMU_RGBD)
     {
-        odom_pub = node_handler.advertise<nav_msgs::Odometry>(node_name + "/body_odom", 1);
+        odom_pub = node->create_publisher<nav_msgs::msg::Odometry>(node_name + "/body_odom", 1);
     }
+    tf_broadcaster = std::make_unique<tf2_ros::TransformBroadcaster>(*node);
 }
 
-void publish_topics(ros::Time msg_time, Eigen::Vector3f Wbb)
+void publish_topics(rclcpp::Time msg_time, Eigen::Vector3f Wbb)
 {
     Sophus::SE3f Twc = pSLAM->GetCamTwc();
 
@@ -138,9 +150,9 @@ void publish_topics(ros::Time msg_time, Eigen::Vector3f Wbb)
     }
 }
 
-void publish_body_odom(Sophus::SE3f Twb_SE3f, Eigen::Vector3f Vwb_E3f, Eigen::Vector3f ang_vel_body, ros::Time msg_time)
+void publish_body_odom(Sophus::SE3f Twb_SE3f, Eigen::Vector3f Vwb_E3f, Eigen::Vector3f ang_vel_body, rclcpp::Time msg_time)
 {
-    nav_msgs::Odometry odom_msg;
+    nav_msgs::msg::Odometry odom_msg;
     odom_msg.child_frame_id = imu_frame_id;
     odom_msg.header.frame_id = world_frame_id;
     odom_msg.header.stamp = msg_time;
@@ -162,12 +174,12 @@ void publish_body_odom(Sophus::SE3f Twb_SE3f, Eigen::Vector3f Vwb_E3f, Eigen::Ve
     odom_msg.twist.twist.angular.y = ang_vel_body.y();
     odom_msg.twist.twist.angular.z = ang_vel_body.z();
 
-    odom_pub.publish(odom_msg);
+    odom_pub->publish(odom_msg);
 }
 
-void publish_camera_pose(Sophus::SE3f Tcw_SE3f, ros::Time msg_time)
+void publish_camera_pose(Sophus::SE3f Tcw_SE3f, rclcpp::Time msg_time)
 {
-    geometry_msgs::PoseStamped pose_msg;
+    geometry_msgs::msg::PoseStamped pose_msg;
     pose_msg.header.frame_id = world_frame_id;
     pose_msg.header.stamp = msg_time;
 
@@ -180,36 +192,35 @@ void publish_camera_pose(Sophus::SE3f Tcw_SE3f, ros::Time msg_time)
     pose_msg.pose.orientation.y = Tcw_SE3f.unit_quaternion().coeffs().y();
     pose_msg.pose.orientation.z = Tcw_SE3f.unit_quaternion().coeffs().z();
 
-    pose_pub.publish(pose_msg);
+    pose_pub->publish(pose_msg);
 }
 
-void publish_tf_transform(Sophus::SE3f T_SE3f, string frame_id, string child_frame_id, ros::Time msg_time)
+void publish_tf_transform(Sophus::SE3f T_SE3f, string frame_id, string child_frame_id, rclcpp::Time msg_time)
 {
-    tf::Transform tf_transform = SE3f_to_tfTransform(T_SE3f);
-
-    static tf::TransformBroadcaster tf_broadcaster;
-
-    tf_broadcaster.sendTransform(tf::StampedTransform(tf_transform, msg_time, frame_id, child_frame_id));
+    geometry_msgs::msg::TransformStamped t;
+    t.transform = SE3f_to_tfTransform(T_SE3f);
+    t.header.stamp = msg_time;
+    t.header.frame_id = frame_id;
+    t.child_frame_id = child_frame_id;
+    tf_broadcaster->sendTransform(t);
 }
 
-void publish_tracking_img(cv::Mat image, ros::Time msg_time)
+void publish_tracking_img(cv::Mat image, rclcpp::Time msg_time)
 {
-    std_msgs::Header header;
+    std_msgs::msg::Header header;
 
     header.stamp = msg_time;
 
     header.frame_id = world_frame_id;
 
-    const sensor_msgs::ImagePtr rendered_image_msg = cv_bridge::CvImage(header, "bgr8", image).toImageMsg();
+    const sensor_msgs::msg::Image::SharedPtr rendered_image_msg = cv_bridge::CvImage(header, "bgr8", image).toImageMsg();
 
     tracking_img_pub.publish(rendered_image_msg);
 }
 
-void publish_keypoints(std::vector<ORB_SLAM3::MapPoint*> tracked_map_points, std::vector<cv::KeyPoint> tracked_keypoints, ros::Time msg_time)
+void publish_keypoints(std::vector<ORB_SLAM3::MapPoint*> tracked_map_points, std::vector<cv::KeyPoint> tracked_keypoints, rclcpp::Time msg_time)
 {   
     std::vector<cv::KeyPoint> finalKeypoints;
-
-    int numKFs = tracked_keypoints.size();
 
     if (tracked_keypoints.empty())
         return;
@@ -233,40 +244,40 @@ void publish_keypoints(std::vector<ORB_SLAM3::MapPoint*> tracked_map_points, std
     //cv::imshow("Keypoints", blankImg);
     //cv::waitKey(1);  
 
-    sensor_msgs::PointCloud2 cloud = keypoints_to_pointcloud(finalKeypoints, msg_time);
+    sensor_msgs::msg::PointCloud2 cloud = keypoints_to_pointcloud(finalKeypoints, msg_time);
 
-    tracked_keypoints_pub.publish(cloud);
+    tracked_keypoints_pub->publish(cloud);
 }
 
 
-void publish_tracked_points(std::vector<ORB_SLAM3::MapPoint*> tracked_points, ros::Time msg_time)
+void publish_tracked_points(std::vector<ORB_SLAM3::MapPoint*> tracked_points, rclcpp::Time msg_time)
 {
-    sensor_msgs::PointCloud2 cloud = mappoint_to_pointcloud(tracked_points, msg_time);
+    sensor_msgs::msg::PointCloud2 cloud = mappoint_to_pointcloud(tracked_points, msg_time);
     
-    tracked_mappoints_pub.publish(cloud);
+    tracked_mappoints_pub->publish(cloud);
 }
 
-void publish_all_points(std::vector<ORB_SLAM3::MapPoint*> map_points, ros::Time msg_time)
+void publish_all_points(std::vector<ORB_SLAM3::MapPoint*> map_points, rclcpp::Time msg_time)
 {
-    sensor_msgs::PointCloud2 cloud = mappoint_to_pointcloud(map_points, msg_time);
+    sensor_msgs::msg::PointCloud2 cloud = mappoint_to_pointcloud(map_points, msg_time);
     
-    all_mappoints_pub.publish(cloud);
+    all_mappoints_pub->publish(cloud);
 }
 
 // More details: http://docs.ros.org/en/api/visualization_msgs/html/msg/Marker.html
-void publish_kf_markers(std::vector<Sophus::SE3f> vKFposes, ros::Time msg_time)
+void publish_kf_markers(std::vector<Sophus::SE3f> vKFposes, rclcpp::Time msg_time)
 {
     int numKFs = vKFposes.size();
     if (numKFs == 0)
         return;
     
-    visualization_msgs::Marker kf_markers;
+    visualization_msgs::msg::Marker kf_markers;
     kf_markers.header.frame_id = world_frame_id;
     kf_markers.ns = "kf_markers";
-    kf_markers.type = visualization_msgs::Marker::SPHERE_LIST;
-    kf_markers.action = visualization_msgs::Marker::ADD;
+    kf_markers.type = visualization_msgs::msg::Marker::SPHERE_LIST;
+    kf_markers.action = visualization_msgs::msg::Marker::ADD;
     kf_markers.pose.orientation.w = 1.0;
-    kf_markers.lifetime = ros::Duration();
+    kf_markers.lifetime = rclcpp::Duration::from_nanoseconds(0);
 
     kf_markers.id = 0;
     kf_markers.scale.x = 0.05;
@@ -277,48 +288,48 @@ void publish_kf_markers(std::vector<Sophus::SE3f> vKFposes, ros::Time msg_time)
 
     for (int i = 0; i <= numKFs; i++)
     {
-        geometry_msgs::Point kf_marker;
+        geometry_msgs::msg::Point kf_marker;
         kf_marker.x = vKFposes[i].translation().x();
         kf_marker.y = vKFposes[i].translation().y();
         kf_marker.z = vKFposes[i].translation().z();
         kf_markers.points.push_back(kf_marker);
     }
     
-    kf_markers_pub.publish(kf_markers);
+    kf_markers_pub->publish(kf_markers);
     
 }
 
-void publish_kf(cv::Mat image, ros::Time msg_time)
+void publish_kf(cv::Mat image, rclcpp::Time msg_time)
 {
-    std_msgs::Header header;
+    std_msgs::msg::Header header;
     header.stamp = msg_time;
     header.frame_id = world_frame_id;
-    const sensor_msgs::ImagePtr rendered_image_msg = cv_bridge::CvImage(header, "bgr8", image).toImageMsg();
+    const sensor_msgs::msg::Image::SharedPtr rendered_image_msg = cv_bridge::CvImage(header, "bgr8", image).toImageMsg();
     kf_pub.publish(rendered_image_msg);
 }
 
 
-void publish_atlas(ORB_SLAM3::Atlas* atlas, ros::Time msg_time)
+void publish_atlas(ORB_SLAM3::Atlas* atlas, rclcpp::Time msg_time)
 {
-    std_msgs::Header header;
+    std_msgs::msg::Header header;
     header.stamp = msg_time;
     header.frame_id = world_frame_id;
 
-    orb_slam3_ros::Atlas atlas_msg;
+    orb_slam3::msg::Atlas atlas_msg;
     atlas_msg.header = header;
     auto vpMaps = atlas->GetAllMaps();
     std::set<decltype(ORB_SLAM3::MapPoint::mnId)> sPoints;
     for(ORB_SLAM3::Map* pMap :vpMaps)
     {
-        orb_slam3_ros::Map map_msg;
+        orb_slam3::msg::Map map_msg;
         for(ORB_SLAM3::KeyFrame* pKF: pMap->GetAllKeyFrames()) 
         {
-            orb_slam3_ros::KeyFrame kf_msg;
+            orb_slam3::msg::KeyFrame kf_msg;
             Sophus::SE3f Twb = pKF->GetPose();
             Eigen::Quaternionf q = Twb.unit_quaternion();
             Sophus::Vector3f tr = Twb.translation();
             kf_msg.id = pKF->mnId;
-            kf_msg.stamp = ros::Time(pKF->mTimeStamp);
+            kf_msg.stamp = rclcpp::Time(pKF->mTimeStamp);
             kf_msg.pose.orientation.w = q.w();
             kf_msg.pose.orientation.x = q.x();
             kf_msg.pose.orientation.y = q.y();
@@ -329,7 +340,7 @@ void publish_atlas(ORB_SLAM3::Atlas* atlas, ros::Time msg_time)
             for (size_t i=0; i < pKF->mvKeys.size(); i++) 
             {
                 cv::KeyPoint kp = pKF->mvKeys[i];
-                orb_slam3_ros::KeyPoint kp_msg;
+                orb_slam3::msg::KeyPoint kp_msg;
                 auto mp = pKF->GetMapPoint(i);
                 if (mp)
                 {
@@ -340,7 +351,7 @@ void publish_atlas(ORB_SLAM3::Atlas* atlas, ros::Time msg_time)
                     if (sPoints.insert(mp->mnId).second) //insert returns second part true if actually inserted
                     { // therefore we need to add this point to the main points list
                         auto pos = mp->GetWorldPos();
-                        orb_slam3_ros::Point3D pt_msg;
+                        orb_slam3::msg::Point3D pt_msg;
                         pt_msg.x = pos.x();
                         pt_msg.y = pos.y();
                         pt_msg.z = pos.z();
@@ -353,7 +364,7 @@ void publish_atlas(ORB_SLAM3::Atlas* atlas, ros::Time msg_time)
         }
         atlas_msg.maps.push_back(map_msg);
     }
-    atlas_pub.publish(atlas_msg);
+    atlas_pub->publish(atlas_msg);
 }
 
 
@@ -361,10 +372,10 @@ void publish_atlas(ORB_SLAM3::Atlas* atlas, ros::Time msg_time)
 // Miscellaneous functions
 //////////////////////////////////////////////////
 
-sensor_msgs::PointCloud2 keypoints_to_pointcloud(std::vector<cv::KeyPoint>& keypoints, ros::Time msg_time) {
+sensor_msgs::msg::PointCloud2 keypoints_to_pointcloud(std::vector<cv::KeyPoint>& keypoints, rclcpp::Time msg_time) {
     const int num_channels = 3; // x y z
 
-    sensor_msgs::PointCloud2 cloud;
+    sensor_msgs::msg::PointCloud2 cloud;
 
     cloud.header.stamp = msg_time;
     cloud.header.frame_id = world_frame_id; 
@@ -383,7 +394,7 @@ sensor_msgs::PointCloud2 keypoints_to_pointcloud(std::vector<cv::KeyPoint>& keyp
         cloud.fields[i].name = channel_id[i];
         cloud.fields[i].offset = i * sizeof(float);
         cloud.fields[i].count = 1;
-        cloud.fields[i].datatype = sensor_msgs::PointField::FLOAT32;
+        cloud.fields[i].datatype = sensor_msgs::msg::PointField::FLOAT32;
     }
 
     cloud.data.resize(cloud.row_step * cloud.height);
@@ -403,7 +414,7 @@ sensor_msgs::PointCloud2 keypoints_to_pointcloud(std::vector<cv::KeyPoint>& keyp
 
 }
 
-sensor_msgs::PointCloud2 mappoint_to_pointcloud(std::vector<ORB_SLAM3::MapPoint*> map_points, ros::Time msg_time)
+sensor_msgs::msg::PointCloud2 mappoint_to_pointcloud(std::vector<ORB_SLAM3::MapPoint*> map_points, rclcpp::Time msg_time)
 {
     const int num_channels = 3; // x y z
 
@@ -412,7 +423,7 @@ sensor_msgs::PointCloud2 mappoint_to_pointcloud(std::vector<ORB_SLAM3::MapPoint*
         std::cout << "Map point vector is empty!" << std::endl;
     }
 
-    sensor_msgs::PointCloud2 cloud;
+    sensor_msgs::msg::PointCloud2 cloud;
 
     cloud.header.stamp = msg_time;
     cloud.header.frame_id = world_frame_id;
@@ -431,7 +442,7 @@ sensor_msgs::PointCloud2 mappoint_to_pointcloud(std::vector<ORB_SLAM3::MapPoint*
         cloud.fields[i].name = channel_id[i];
         cloud.fields[i].offset = i * sizeof(float);
         cloud.fields[i].count = 1;
-        cloud.fields[i].datatype = sensor_msgs::PointField::FLOAT32;
+        cloud.fields[i].datatype = sensor_msgs::msg::PointField::FLOAT32;
     }
 
     cloud.data.resize(cloud.row_step * cloud.height);
@@ -443,14 +454,10 @@ sensor_msgs::PointCloud2 mappoint_to_pointcloud(std::vector<ORB_SLAM3::MapPoint*
     {
         if (map_points[i])
         {
-            Eigen::Vector3d P3Dw = map_points[i]->GetWorldPos().cast<double>();
-
-            tf::Vector3 point_translation(P3Dw.x(), P3Dw.y(), P3Dw.z());
+            Eigen::Vector3f P3Dw = map_points[i]->GetWorldPos().cast<float>();
 
             float data_array[num_channels] = {
-                point_translation.x(),
-                point_translation.y(),
-                point_translation.z()
+                P3Dw.x(), P3Dw.y(), P3Dw.z()
             };
 
             memcpy(cloud_data_ptr+(i*cloud.point_step), data_array, num_channels*sizeof(float));
@@ -469,22 +476,53 @@ cv::Mat SE3f_to_cvMat(Sophus::SE3f T_SE3f)
     return T_cvmat;
 }
 
-tf::Transform SE3f_to_tfTransform(Sophus::SE3f T_SE3f)
+geometry_msgs::msg::Transform SE3f_to_tfTransform(Sophus::SE3f T_SE3f)
 {
-    Eigen::Matrix3f R_mat = T_SE3f.rotationMatrix();
-    Eigen::Vector3f t_vec = T_SE3f.translation();
+    geometry_msgs::msg::Transform t;
+    auto quat = T_SE3f.so3().unit_quaternion();
+    auto tf = T_SE3f.translation();
+    t.rotation.x = quat.x();
+    t.rotation.y = quat.y();
+    t.rotation.z = quat.z();
+    t.rotation.w = quat.w();
+    t.translation.x = tf.x();
+    t.translation.y = tf.y();
+    t.translation.z = tf.z();
+    return t;
+}
 
-    tf::Matrix3x3 R_tf(
-        R_mat(0, 0), R_mat(0, 1), R_mat(0, 2),
-        R_mat(1, 0), R_mat(1, 1), R_mat(1, 2),
-        R_mat(2, 0), R_mat(2, 1), R_mat(2, 2)
-    );
+rclcpp::Node::SharedPtr init(int argc, char **argv, std::string name, ORB_SLAM3::System::eSensor sensor) {
+    rclcpp::init(argc, argv);
+    auto node = rclcpp::Node::make_shared(name);
+    auto logger = node->get_logger();
+    if (argc > 1)
+    {
+        RCLCPP_WARN(logger, "Arguments supplied via command line are ignored.");
+    }
 
-    tf::Vector3 t_tf(
-        t_vec(0),
-        t_vec(1),
-        t_vec(2)
-    );
+    std::string voc_file = node->declare_parameter("voc_file", "file_not_set");
+    std::string settings_file = node->declare_parameter("settings_file", "file_not_set");
 
-    return tf::Transform(R_tf, t_tf);
+    if (voc_file == "file_not_set" || settings_file == "file_not_set")
+    {
+        RCLCPP_ERROR(logger, "Please provide voc_file and settings_file in the launch file");       
+        rclcpp::shutdown();
+        return NULL;
+    }
+
+    std::string world_frame_id = node->declare_parameter("world_frame_id", "map");
+    std::string cam_frame_id = node->declare_parameter("cam_frame_id", "camera");
+    sensor_type = sensor;
+    // Create SLAM system. It initializes all system threads and gets ready to process frames.
+    pSLAM = new ORB_SLAM3::System(voc_file, settings_file, sensor_type);
+    return node;
+}
+
+void run(rclcpp::Node::SharedPtr node) {
+    rclcpp::spin_some(node);
+
+    // Stop all threads
+    pSLAM->Shutdown();
+    rclcpp::shutdown();
+
 }

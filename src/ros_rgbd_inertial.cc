@@ -6,15 +6,17 @@
 
 #include "common.h"
 
+using std::placeholders::_1;
+using std::placeholders::_2;
 using namespace std;
 
 class ImuGrabber
 {
 public:
     ImuGrabber(){};
-    void GrabImu(const sensor_msgs::ImuConstPtr &imu_msg);
+    void GrabImu(const sensor_msgs::msg::Imu::ConstSharedPtr imu_msg);
 
-    queue<sensor_msgs::ImuConstPtr> imuBuf;
+    queue<sensor_msgs::msg::Imu::ConstSharedPtr> imuBuf;
     std::mutex mBufMutex;
 };
 
@@ -23,11 +25,11 @@ class ImageGrabber
 public:
     ImageGrabber(ImuGrabber *pImuGb): mpImuGb(pImuGb){}
 
-    void GrabRGBD(const sensor_msgs::ImageConstPtr& msgRGB, const sensor_msgs::ImageConstPtr& msgD);
-    cv::Mat GetImage(const sensor_msgs::ImageConstPtr &img_msg);
+    void GrabRGBD(const sensor_msgs::msg::Image::ConstSharedPtr msgRGB, const sensor_msgs::msg::Image::ConstSharedPtr msgD);
+    cv::Mat GetImage(const sensor_msgs::msg::Image::ConstSharedPtr img_msg);
     void SyncWithImu();
     void ShowStats();
-    queue<sensor_msgs::ImageConstPtr> imgRGBBuf, imgDBuf;
+    queue<sensor_msgs::msg::Image::ConstSharedPtr> imgRGBBuf, imgDBuf;
     std::mutex mBufMutex;
     ImuGrabber *mpImuGb;
 private:
@@ -37,62 +39,28 @@ private:
 
 int main(int argc, char **argv)
 {
-    ros::init(argc, argv, "RGBD_Inertial");
-    ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Info);
-    if (argc > 1)
-    {
-        ROS_WARN ("Arguments supplied via command line are ignored.");
-    }
-
-    std::string node_name = ros::this_node::getName();
-
-    ros::NodeHandle node_handler;
-    image_transport::ImageTransport image_transport(node_handler);
-
-    std::string voc_file, settings_file;
-    node_handler.param<std::string>(node_name + "/voc_file", voc_file, "file_not_set");
-    node_handler.param<std::string>(node_name + "/settings_file", settings_file, "file_not_set");
-
-    if (voc_file == "file_not_set" || settings_file == "file_not_set")
-    {
-        ROS_ERROR("Please provide voc_file and settings_file in the launch file");       
-        ros::shutdown();
-        return 1;
-    }
-
-    bool enable_pangolin;
-    node_handler.param<bool>(node_name + "/enable_pangolin", enable_pangolin, true);
-
-    node_handler.param<std::string>(node_name + "/world_frame_id", world_frame_id, "map");
-    node_handler.param<std::string>(node_name + "/cam_frame_id", cam_frame_id, "camera");
-    node_handler.param<std::string>(node_name + "/imu_frame_id", imu_frame_id, "imu");
-
-    // Create SLAM system. It initializes all system threads and gets ready to process frames.
-    sensor_type = ORB_SLAM3::System::IMU_RGBD;
-    pSLAM = new ORB_SLAM3::System(voc_file, settings_file, sensor_type, enable_pangolin);
+    auto node = init(argc, argv, "RGBD_Inertial", ORB_SLAM3::System::IMU_RGBD);
+    if (node==NULL) return 1;
+    std::string node_name = node->get_name();
 
     ImuGrabber imugb;
     ImageGrabber igb(&imugb);
 
-    ros::Subscriber sub_imu = node_handler.subscribe("/imu", 100, &ImuGrabber::GrabImu, &imugb);
+    auto sub_imu = node->create_subscription<sensor_msgs::msg::Imu>("/imu", 1, std::bind(&ImuGrabber::GrabImu, &imugb,_1));
 
-    message_filters::Subscriber<sensor_msgs::Image> sub_rgb_img(node_handler, "/camera/rgb/image_raw", 1);
-    message_filters::Subscriber<sensor_msgs::Image> sub_depth_img(node_handler, "/camera/depth_registered/image_raw", 1);
+    message_filters::Subscriber<sensor_msgs::msg::Image> sub_rgb_img(node, "/camera/rgb/image_raw");
+    message_filters::Subscriber<sensor_msgs::msg::Image> sub_depth_img(node, "/camera/depth_registered/image_raw");
 
-    typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> sync_pol;
+    typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::msg::Image, sensor_msgs::msg::Image> sync_pol;
     message_filters::Synchronizer<sync_pol> sync(sync_pol(5), sub_rgb_img, sub_depth_img);
-    sync.registerCallback(boost::bind(&ImageGrabber::GrabRGBD, &igb, _1, _2));
+    sync.registerCallback(std::bind(&ImageGrabber::GrabRGBD, &igb, _1, _2));
 
-    setup_publishers(node_handler, image_transport, node_name);
-    setup_services(node_handler, node_name);
+    setup_publishers(node, node_name);
+    setup_services(node, node_name);
 
     std::thread sync_thread(&ImageGrabber::SyncWithImu, &igb);
 
-    ros::spin();
-
-    // Stop all threads
-    pSLAM->Shutdown();
-    ros::shutdown();
+    run(node);
 
     return 0;
 }
@@ -101,7 +69,7 @@ int main(int argc, char **argv)
 // Functions
 //////////////////////////////////////////////////
 
-void ImageGrabber::GrabRGBD(const sensor_msgs::ImageConstPtr& msgRGB,const sensor_msgs::ImageConstPtr& msgD)
+void ImageGrabber::GrabRGBD(const sensor_msgs::msg::Image::ConstSharedPtr msgRGB,const sensor_msgs::msg::Image::ConstSharedPtr msgD)
 {
     mBufMutex.lock();
 
@@ -124,7 +92,7 @@ void ImageGrabber::ShowStats()
 
 }
 
-cv::Mat ImageGrabber::GetImage(const sensor_msgs::ImageConstPtr &img_msg)
+cv::Mat ImageGrabber::GetImage(const sensor_msgs::msg::Image::ConstSharedPtr img_msg)
 {
     // Copy the ros image message to cv::Mat.
     cv_bridge::CvImageConstPtr cv_ptr;
@@ -134,7 +102,7 @@ cv::Mat ImageGrabber::GetImage(const sensor_msgs::ImageConstPtr &img_msg)
     }
     catch (cv_bridge::Exception& e)
     {
-        ROS_ERROR("cv_bridge exception: %s", e.what());
+        RCLCPP_ERROR(rclcpp::get_logger(""), "cv_bridge exception: %s", e.what());
     }
 
     return cv_ptr->image.clone();
@@ -147,14 +115,13 @@ void ImageGrabber::SyncWithImu()
         if (!imgRGBBuf.empty() && !mpImuGb->imuBuf.empty())
         {
             cv::Mat im, depth;
-            double tIm = 0;
 
-            tIm = imgRGBBuf.front()->header.stamp.toSec();
-            if (tIm > mpImuGb->imuBuf.back()->header.stamp.toSec())
+            rclcpp::Time tIm(imgRGBBuf.front()->header.stamp);
+            if (tIm > rclcpp::Time(mpImuGb->imuBuf.back()->header.stamp))
                 continue;
             
             this->mBufMutex.lock();
-            ros::Time msg_time = imgRGBBuf.front()->header.stamp;
+            rclcpp::Time msg_time(imgRGBBuf.front()->header.stamp);
             im = GetImage(imgRGBBuf.front());
             imgRGBBuf.pop();
             depth = GetImage(imgDBuf.front());
@@ -168,15 +135,15 @@ void ImageGrabber::SyncWithImu()
             if (!mpImuGb->imuBuf.empty())
             {
                 // Load imu measurements from buffer
-                while(!mpImuGb->imuBuf.empty() && mpImuGb->imuBuf.front()->header.stamp.toSec() <= tIm)
+                while(!mpImuGb->imuBuf.empty() && rclcpp::Time(mpImuGb->imuBuf.front()->header.stamp) <= tIm)
                 {
-                    double t = mpImuGb->imuBuf.front()->header.stamp.toSec();
+                    rclcpp::Time t(mpImuGb->imuBuf.front()->header.stamp);
 
                     cv::Point3f acc(mpImuGb->imuBuf.front()->linear_acceleration.x, mpImuGb->imuBuf.front()->linear_acceleration.y, mpImuGb->imuBuf.front()->linear_acceleration.z);
                     
                     cv::Point3f gyr(mpImuGb->imuBuf.front()->angular_velocity.x, mpImuGb->imuBuf.front()->angular_velocity.y, mpImuGb->imuBuf.front()->angular_velocity.z);
 
-                    vImuMeas.push_back(ORB_SLAM3::IMU::Point(acc, gyr, t));
+                    vImuMeas.push_back(ORB_SLAM3::IMU::Point(acc, gyr, t.seconds()));
                     
                     Wbb << mpImuGb->imuBuf.front()->angular_velocity.x, mpImuGb->imuBuf.front()->angular_velocity.y, mpImuGb->imuBuf.front()->angular_velocity.z;
 
@@ -186,7 +153,7 @@ void ImageGrabber::SyncWithImu()
             mpImuGb->mBufMutex.unlock();
 
             // ORB-SLAM3 runs in TrackRGBD()
-            Sophus::SE3f Tcw = pSLAM->TrackRGBD(im, depth, tIm, vImuMeas);
+            Sophus::SE3f Tcw = pSLAM->TrackRGBD(im, depth, tIm.seconds(), vImuMeas);
             
             publish_topics(msg_time, Wbb);
             if (mframeCount++ % 20 == 0) 
@@ -206,7 +173,7 @@ void ImageGrabber::SyncWithImu()
     }
 }
 
-void ImuGrabber::GrabImu(const sensor_msgs::ImuConstPtr &imu_msg)
+void ImuGrabber::GrabImu(const sensor_msgs::msg::Imu::ConstSharedPtr imu_msg)
 {
     mBufMutex.lock();
     imuBuf.push(imu_msg);

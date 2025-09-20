@@ -9,8 +9,8 @@ MESSAGE("Build type: " ${CMAKE_BUILD_TYPE})
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -Wall   -O3")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall   -O3")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -Wall -O3 -fPIC")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -O3 -fPIC -Wno-reorder -Wno-deprecated-declarations -Wno-unused-but-set-variable -Wno-unused-parameter")
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
 
@@ -28,6 +28,7 @@ find_package(Eigen3 3.1.0 REQUIRED)
 
 # ament stuff
 find_package(ament_cmake REQUIRED)
+find_package(Boost REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(image_transport REQUIRED)
 find_package(nav_msgs REQUIRED)
@@ -52,13 +53,22 @@ set(ament_deps
   geometry_msgs
   sensor_msgs
   visualization_msgs
+  Boost
 )
 
+set(orb_targets
+  ros_mono
+  ros_mono_inertial
+  ros_stereo
+  ros_stereo_inertial
+  ros_rgbd
+  ros_rgbd_inertial
+)
 
 set(srv_files
   srv/SaveMap.srv
 )
-
+ 
 set(msg_files
   msg/Atlas.msg
   msg/Map.msg
@@ -73,7 +83,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   DEPENDENCIES geometry_msgs std_msgs
 )
 
-ament_export_dependencies(rclcpp rclpy std_msgs cv_bridge image_transport tf2 tf2_ros sensor_msgs rosidl_default_runtime)
+ament_export_dependencies(Boost rclcpp rclpy std_msgs cv_bridge image_transport tf2 tf2_ros sensor_msgs rosidl_default_runtime)
 ament_export_libraries({PROJECT_NAME} libDBoW2 libg2o)
 
 ## Specify additional locations of header files
@@ -158,66 +168,91 @@ target_link_libraries(${PROJECT_NAME}_lib
   ${PROJECT_SOURCE_DIR}/orb_slam3/Thirdparty/g2o/lib/libg2o.so
   -lboost_system
   -lboost_serialization
+  -lboost_filesystem
   -lcrypto
 )
 
 ## ROS node
-add_executable(ros_mono
-  src/ros_mono.cc
-  src/common.cc
-)
-target_link_libraries(ros_mono
-  ${PROJECT_NAME}_lib
-)
-
-rosidl_target_interfaces(ros_mono
-  ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 ## ROS node
-add_executable(ros_mono_inertial 
-  src/ros_mono_inertial.cc
-  src/common.cc
-)
-target_link_libraries(ros_mono_inertial 
-  ${PROJECT_NAME}_lib
-)
+#add_executable(ros_mono_inertial 
+#  src/ros_mono_inertial.cc
+#  src/common.cc
+#)
+#target_link_libraries(ros_mono_inertial 
+#  ${PROJECT_NAME}_lib
+#)
+#rosidl_target_interfaces(ros_mono_inertial
+#  ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
 
 ## ROS node
-add_executable(ros_stereo 
-  src/ros_stereo.cc
-  src/common.cc
-)
-target_link_libraries(ros_stereo
-  ${PROJECT_NAME}_lib
-)
+#add_executable(ros_stereo 
+#  src/ros_stereo.cc
+#  src/common.cc
+#)
+#target_link_libraries(ros_stereo
+#  ${PROJECT_NAME}_lib
+#)
+#rosidl_target_interfaces(ros_stereo
+#  ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
 
 ## ROS node
-add_executable(ros_stereo_inertial
-  src/ros_stereo_inertial.cc
-  src/common.cc
-)
-target_link_libraries(ros_stereo_inertial 
-  ${PROJECT_NAME}_lib
-)
+#add_executable(ros_stereo_inertial
+#  src/ros_stereo_inertial.cc
+#  src/common.cc
+#)
+#target_link_libraries(ros_stereo_inertial 
+#  ${PROJECT_NAME}_lib
+#)
+#rosidl_target_interfaces(ros_stereo_inertial
+#  ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
 
 ## ROS node
-add_executable(ros_rgbd
-  src/ros_rgbd.cc
-  src/common.cc
-)
-target_link_libraries(ros_rgbd
-  ${PROJECT_NAME}_lib
-)
+#add_executable(ros_rgbd
+#  src/ros_rgbd.cc
+#  src/common.cc
+#)
+#target_link_libraries(ros_rgbd
+#  ${PROJECT_NAME}_lib
+#)
+#rosidl_target_interfaces(ros_rgbd
+#  ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
 
 ## ROS node
-add_executable(ros_rgbd_inertial
-  src/ros_rgbd_inertial.cc
-  src/common.cc
-)
-target_link_libraries(ros_rgbd_inertial
-  ${PROJECT_NAME}_lib
-)
+#add_executable(ros_rgbd_inertial
+#  src/ros_rgbd_inertial.cc
+#  src/common.cc
+#)
+#target_link_libraries(ros_rgbd_inertial
+#  ${PROJECT_NAME}_lib
+#)
+#rosidl_target_interfaces(ros_rgbd_inertial
+#  ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
-ament_target_dependencies(ros_mono ${ament_deps})
+foreach(tgt IN LISTS orb_targets)
+  add_executable(${tgt}
+    src/${tgt}.cc
+    src/common.cc
+  )
+  target_link_libraries(${tgt} ${PROJECT_NAME}_lib)
+  rosidl_target_interfaces(${tgt} ${PROJECT_NAME} "rosidl_typesupport_cpp")
+  ament_target_dependencies(${tgt} ${ament_deps})  
+endforeach()
+
+
+#ament_target_dependencies(ros_mono_inertial ${ament_deps})
+#ament_target_dependencies(ros_stereo ${ament_deps})
+#ament_target_dependencies(ros_stereo_inertial ${ament_deps})
+#ament_target_dependencies(ros_rgbd ${ament_deps})
+#ament_target_dependencies(ros_rgbd_inertial ${ament_deps})
+
+install(TARGETS
+  ${orb_targets}
+  DESTINATION lib/${PROJECT_NAME})
+
 
 ament_package()
