@@ -254,5 +254,8 @@ install(TARGETS
   ${orb_targets}
   DESTINATION lib/${PROJECT_NAME})
 
+install(FILES
+  orb_slam3/Vocabulary/ORBvoc.txt.bin
+  DESTINATION share/${PROJECT_NAME}/vocab)
 
 ament_package()
