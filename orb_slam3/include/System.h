@@ -55,12 +55,19 @@ public:
     };
 
     static eLevel th;
+    using PrintFunc = void(*)(const std::string&, eLevel);
+    static PrintFunc customPrint;
 
 public:
     static void PrintMess(std::string str, eLevel lev)
     {
-        if(lev <= th)
-            cout << str << endl;
+        if (customPrint)
+        {
+            customPrint(str, lev);
+        } else {
+            if(lev <= th)
+                cout << str << endl;
+        }
     }
 
     static void SetTh(eLevel _th)
