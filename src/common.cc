@@ -491,8 +491,27 @@ geometry_msgs::msg::Transform SE3f_to_tfTransform(Sophus::SE3f T_SE3f)
     return t;
 }
 
+void ROS2Printer(const std::string& msg, ORB_SLAM3::Verbose::eLevel lev)
+{
+    auto logger = rclcpp::get_logger("ORB");
+    switch (lev)
+    {
+        case ORB_SLAM3::Verbose::VERBOSITY_QUIET:
+            RCLCPP_WARN(logger, "%s", msg.c_str());
+            break;
+        case ORB_SLAM3::Verbose::VERBOSITY_NORMAL:
+            RCLCPP_INFO(logger, "%s", msg.c_str());
+            break;
+        case ORB_SLAM3::Verbose::VERBOSITY_DEBUG:
+        default:
+            RCLCPP_DEBUG(logger, "%s", msg.c_str());
+            break;
+    }
+}
+
 rclcpp::Node::SharedPtr init(int argc, char **argv, std::string name, ORB_SLAM3::System::eSensor sensor) {
     rclcpp::init(argc, argv);
+    ORB_SLAM3::Verbose::customPrint = ROS2Printer;
     auto node = rclcpp::Node::make_shared(name);
     auto logger = node->get_logger();
     if (argc > 1)
@@ -510,19 +529,30 @@ rclcpp::Node::SharedPtr init(int argc, char **argv, std::string name, ORB_SLAM3:
         return NULL;
     }
 
-    std::string world_frame_id = node->declare_parameter("world_frame_id", "map");
-    std::string cam_frame_id = node->declare_parameter("cam_frame_id", "camera");
+    world_frame_id = node->declare_parameter("world_frame_id", "map");
+    cam_frame_id = node->declare_parameter("cam_frame_id", "camera");
+
     sensor_type = sensor;
+    if (sensor_type == ORB_SLAM3::System::IMU_MONOCULAR || sensor_type == ORB_SLAM3::System::IMU_STEREO || sensor_type == ORB_SLAM3::System::IMU_RGBD)
+    {
+        imu_frame_id = node->declare_parameter("imu_frame_id", "imu");
+    }
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
     pSLAM = new ORB_SLAM3::System(voc_file, settings_file, sensor_type);
+    RCLCPP_INFO(logger, "pSLAM created");       
     return node;
 }
 
 void run(rclcpp::Node::SharedPtr node) {
-    rclcpp::spin_some(node);
+    auto logger = node->get_logger();
+    RCLCPP_INFO(logger, "Spinning");       
+    rclcpp::spin(node);
+    RCLCPP_INFO(logger, "Finished spin");       
 
     // Stop all threads
     pSLAM->Shutdown();
+    RCLCPP_INFO(logger, "mid shutdwon");       
     rclcpp::shutdown();
+    RCLCPP_INFO(logger, "can this work?");       
 
 }
