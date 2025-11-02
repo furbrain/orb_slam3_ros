@@ -31,7 +31,7 @@ int main(int argc, char **argv)
     message_filters::Subscriber<sensor_msgs::msg::Image> sub_rgb_img(node, "/camera/rgb/image_raw");
     message_filters::Subscriber<sensor_msgs::msg::Image> sub_depth_img(node, "/camera/depth_registered/image_raw");
     typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::msg::Image, sensor_msgs::msg::Image> sync_pol;
-    message_filters::Synchronizer<sync_pol> sync(sync_pol(3), sub_rgb_img, sub_depth_img);
+    message_filters::Synchronizer<sync_pol> sync(sync_pol(10), sub_rgb_img, sub_depth_img);
     sync.registerCallback(std::bind(&ImageGrabber::GrabRGBD, &igb, _1, _2));
 
     setup_publishers(node, node_name);
@@ -70,7 +70,6 @@ void ImageGrabber::GrabRGBD(const sensor_msgs::msg::Image::ConstSharedPtr msgRGB
         RCLCPP_ERROR(rclcpp::get_logger(""),"cv_bridge exception: %s", e.what());
         return;
     }
-    
     // ORB-SLAM3 runs in TrackRGBD()
     Sophus::SE3f Tcw = pSLAM->TrackRGBD(cv_ptrRGB->image, cv_ptrD->image, rclcpp::Time(cv_ptrRGB->header.stamp).seconds());
 
