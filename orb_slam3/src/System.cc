@@ -37,6 +37,8 @@ namespace ORB_SLAM3
 {
 
 Verbose::eLevel Verbose::th = Verbose::VERBOSITY_NORMAL;
+Verbose::PrintFunc Verbose::customPrint = nullptr;
+
 
 System::System(const string &strVocFile, const string &strSettingsFile, const eSensor sensor,
     const int initFr, const string &strSequence):
