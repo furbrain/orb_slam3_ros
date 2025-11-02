@@ -11,6 +11,8 @@ CMakeLists.txt.user
 CMakeLists_modified.txt
 
 .vscode/
+.cache/
+log/
 
 
 KeyFrameTrajectory.txt
