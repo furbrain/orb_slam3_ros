@@ -75,6 +75,7 @@ set(msg_files
   msg/KeyFrame.msg
   msg/KeyPoint.msg
   msg/Point3D.msg
+  msg/NumPoints.msg
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}
