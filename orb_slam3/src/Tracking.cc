@@ -1876,7 +1876,22 @@ void Tracking::Track() {
         } else {
           Verbose::PrintMess("TRACK: Track with motion model",
                              Verbose::VERBOSITY_DEBUG);
+          PredictStateIMU();
+          Sophus::SE3f T = mCurrentFrame.GetPose();
+          std::ostringstream oss;
+          oss << "TRACK: pose from IMU "
+              << "R=" << T.unit_quaternion()
+              << ", t=" << T.translation().transpose();
+          std::string s = oss.str();
+          Verbose::PrintMess(s, Verbose::VERBOSITY_DEBUG);
           bOK = TrackWithMotionModel();
+          T = mCurrentFrame.GetPose();
+          oss.str("");
+          oss << "TRACK: pose from model "
+              << "R=" << T.unit_quaternion()
+              << ", t=" << T.translation().transpose();
+          s = oss.str();
+          Verbose::PrintMess(s, Verbose::VERBOSITY_DEBUG);
           if (!bOK)
             bOK = TrackReferenceKeyFrame();
         }
@@ -2737,7 +2752,7 @@ bool Tracking::TrackWithMotionModel() {
       (mCurrentFrame.mnId > mnLastRelocFrameId + mnFramesToResetIMU)) {
     // Predict state with IMU if it is initialized and it doesnt need reset
     PredictStateIMU();
-    return true;
+    // return true;
   } else {
     mCurrentFrame.SetPose(mVelocity * mLastFrame.GetPose());
   }
@@ -2759,7 +2774,7 @@ bool Tracking::TrackWithMotionModel() {
 
   // If few matches, uses a wider window search
   if (nmatches < 20) {
-    Verbose::PrintMess("Not enough matches, wider window search!!",
+    Verbose::PrintMess("TMM: Not enough matches, wider window search!!",
                        Verbose::VERBOSITY_NORMAL);
     fill(mCurrentFrame.mvpMapPoints.begin(), mCurrentFrame.mvpMapPoints.end(),
          static_cast<MapPoint *>(NULL));
@@ -2767,12 +2782,12 @@ bool Tracking::TrackWithMotionModel() {
     nmatches = matcher.SearchByProjection(mCurrentFrame, mLastFrame, 2 * th,
                                           mSensor == System::MONOCULAR ||
                                               mSensor == System::IMU_MONOCULAR);
-    Verbose::PrintMess("Matches with wider search: " + to_string(nmatches),
+    Verbose::PrintMess("TMM: Matches with wider search: " + to_string(nmatches),
                        Verbose::VERBOSITY_NORMAL);
   }
 
   if (nmatches < 20) {
-    Verbose::PrintMess("Not enough matches!!", Verbose::VERBOSITY_NORMAL);
+    Verbose::PrintMess("TMM: Not enough matches!!", Verbose::VERBOSITY_NORMAL);
     if (mSensor == System::IMU_MONOCULAR || mSensor == System::IMU_STEREO ||
         mSensor == System::IMU_RGBD)
       return true;

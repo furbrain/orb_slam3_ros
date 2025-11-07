@@ -467,7 +467,7 @@ void Optimizer::FullInertialBA(Map *pMap, int its, const bool bFixLocal,
     KeyFrame *pKFi = vpKFs[i];
 
     if (!pKFi->mPrevKF) {
-      Verbose::PrintMess("NOT INERTIAL LINK TO PREVIOUS FRAME!",
+      Verbose::PrintMess("NOT INERTIAL LINK TO PREVIOUS FRAME!" + to_string(i),
                          Verbose::VERBOSITY_NORMAL);
       continue;
     }
