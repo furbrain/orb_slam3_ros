@@ -1728,6 +1728,111 @@ void Tracking::ResetFrameIMU() {
   // TODO To implement...
 }
 
+/**
+ * @brief Main per-frame tracking routine for the Tracking thread.
+ *
+ * This method performs the complete processing pipeline for a single camera
+ * frame: input sanity checks, optional IMU preintegration, initialization
+ * (monocular or stereo/RGB-D), pose prediction and estimation, relocalization
+ * when necessary, local map tracking, keyframe insertion, bookkeeping for the
+ * trajectory, and various safety/reset behaviors.
+ *
+ * @details
+ * High-level behavior:
+ *  - If step-by-step debugging is enabled, waits until the next step trigger.
+ *  - Handles IMU-related error flags coming from the LocalMapper and requests
+ *    map reset via the parent System when required.
+ *  - Retrieves the current active map and locks it with a unique_lock to
+ *    prevent concurrent modifications during tracking.
+ *  - Validates timestamps (detects backwards or large forward jumps) and
+ *    triggers IMU reset or map reset/create accordingly when using inertial
+ *    maps.
+ *  - For inertial sensors and if a last keyframe exists, initializes the frame
+ *    IMU bias from that keyframe.
+ *  - Performs IMU preintegration for the incoming frame when required (before
+ *    first map creation).
+ *  - If the system is not initialized, runs the appropriate initialization
+ *    routine:
+ *      - Stereo/RGB-D/IMU-stereo/RGB-D => StereoInitialization()
+ *      - Monocular => MonocularInitialization()
+ *    On successful initialization, records the first frame id for the active
+ *    map.
+ *  - After initialization, chooses how to obtain an initial camera pose:
+ *      - If only-tracking mode is disabled: attempts tracking using either the
+ *        reference keyframe or a motion model (with IMU prediction when
+ *        available). Falls back to reference tracking if motion-model-based
+ *        tracking fails.
+ *      - If only-tracking mode is enabled: performs relocalization when lost,
+ *        otherwise uses motion model or reference keyframe depending on VO
+ *        flags.
+ *  - Manages transient tracking states:
+ *      - OK: Normal tracking.
+ *      - RECENTLY_LOST: Short-term loss; try to recover for a time window.
+ *      - LOST: Camera is lost; decide to reset the active map or create a new
+ *        map depending on the number of keyframes and IMU initialization.
+ *  - If an initial pose estimate is available and matching succeeded, runs
+ *    TrackLocalMap() to refine the pose and correspondences.
+ *  - Updates the internal motion model (mVelocity / mbVelocity) when possible.
+ *  - Cleans up visual-odometry-only matches and deletes any temporary
+ *    MapPoints created for the frame.
+ *  - Decides whether to insert a new keyframe (NeedNewKeyFrame()) and creates
+ *    it when appropriate. If a new keyframe is created, marks the last frame
+ *    accordingly.
+ *  - When IMU is used and relocalization occurs, may save a copy of the frame
+ *    (and its previous frame and preintegration) for IMU reset logic.
+ *  - Updates mpFrameDrawer to reflect the current tracking state for
+ *    visualization.
+ *  - Appends the relative frame pose, reference keyframe, timestamp and lost
+ *    flag to trajectory buffers (mlRelativeFramePoses, mlpReferences,
+ *    mlFrameTimes, mlbLost) when the state is OK or RECENTLY_LOST.
+ *
+ * @note Thread safety and synchronization:
+ *  - Locks the current Map's mMutexMapUpdate for the critical section that
+ *    requires the map not to be changed by other threads (local mapping,
+ *    loopclosing, etc.).
+ *  - When detecting an out-of-order IMU/frame timestamp, locks mMutexImuQueue
+ *    to clear the IMU queue before resetting/creating maps.
+ *
+ * @note IMU specifics:
+ *  - Preintegrates IMU measurements before the first map is created when using
+ *    IMU-enabled sensors.
+ *  - Uses IMU bias from the last keyframe when available.
+ *  - When relocalization happens in an inertial map, may save frames needed
+ *    to reset IMU integration and may reset the per-frame IMU state at a
+ *    specific frame id offset after relocalization.
+ *  - If the LocalMapper reports a bad IMU, the active map is reset immediately.
+ *
+ * @note Error handling / resets:
+ *  - Detects timestamp inconsistencies and either resets the map or creates a
+ *    new map depending on IMU initialization and inertial flags.
+ *  - If tracking is lost soon after initialization and the map is small,
+ *    resets the active map to avoid degeneracy.
+ *
+ * @warning Memory & ownership:
+ *  - May allocate new Frame and IMU::Preintegrated objects when saving frames
+ *    for IMU reset (caller/owner is responsible for their eventual release).
+ *  - Deletes temporary MapPoints stored in mlpTemporalPoints before clearing
+ *    the list.
+ *
+ * @sideeffects
+ *  - Mutates many Tracking internal state variables: mState, mbVelocity,
+ *    mVelocity, mLastFrame, mlRelativeFramePoses, mlpReferences, mlFrameTimes,
+ *    mlbLost, mbLastFrameIsKF, mbMapUpdated, mbCreatedMap, and potentially
+ *    mpLastKeyFrame and mnFirstFrameId.
+ *  - Can call back into the System to ResetActiveMap() or CreateMapInAtlas().
+ *  - Can create new keyframes via CreateNewKeyFrame() and may invoke
+ *    LocalMapping/LoopClosing indirectly through map mutations.
+ *
+ * @pre The Tracking object must have been initialized with pointers to the
+ * parent System, Atlas, LocalMapper, and FrameDrawer, and internal sensor type
+ * must be properly configured.
+ *
+ * @post Either the current frame is integrated into the map/trajectory (state
+ * OK or RECENTLY_LOST), or a recovery/reset action has been triggered (map
+ * reset or new map creation) and the function returns early.
+ *
+ * @return void
+ */
 void Tracking::Track() {
   mbLastFrameIsKF = false;
   if (bStepByStep) {
@@ -2831,6 +2936,28 @@ bool Tracking::TrackWithMotionModel() {
     return nmatchesMap >= 10;
 }
 
+/**
+ * @brief Tracks the local map by matching current frame features with local map
+ * points
+ *
+ * This function performs the following steps:
+ * 1. Updates the local map and searches for matches between frame features and
+ * map points
+ * 2. Performs pose optimization based on camera mode (IMU initialized or not)
+ * 3. Updates statistics for matched map points and tracks inlier matches
+ * 4. Validates tracking success based on:
+ *    - Number of inlier matches (varies by sensor type)
+ *    - Recent relocalization status
+ *    - IMU initialization state (for IMU sensors)
+ *
+ * @return true if tracking was successful based on sensor-specific criteria:
+ *         - IMU_MONOCULAR: >= 15 inliers (IMU initialized) or >= 50 inliers
+ * (IMU not initialized)
+ *         - IMU_STEREO/IMU_RGBD: >= 15 inliers
+ *         - Other sensors: >= 30 inliers
+ *         - Special case: returns true if > 10 inliers in RECENTLY_LOST state
+ * @return false if tracking failed based on above criteria
+ */
 bool Tracking::TrackLocalMap() {
 
   // We have an estimation of the camera pose and some map points tracked in the
@@ -3222,6 +3349,26 @@ void Tracking::CreateNewKeyFrame() {
   mpLastKeyFrame = pKF;
 }
 
+/**
+ * @brief Searches for local map points that can be matched with the current
+ * frame.
+ *
+ * This function performs the following steps:
+ * 1. Iterates through the current frame's map points, marking bad points as
+ * null and updating visibility statistics for valid points.
+ * 2. Projects local map points into the current frame, checks their visibility,
+ * and updates their status if they are in the camera frustum.
+ * 3. Prepares a list of candidate map points to match based on their visibility
+ * and tracking status.
+ * 4. Dynamically determines the matching threshold based on the sensor type,
+ * IMU initialization status, and recent relocalization events.
+ * 5. Uses an ORB matcher to search for correspondences between the current
+ * frame and the projected local map points using the computed threshold.
+ *
+ * The function updates the current frame's map point associations and
+ * projection information, which are used for pose estimation and map
+ * refinement.
+ */
 void Tracking::SearchLocalPoints() {
   // Do not search map points already matched
   for (vector<MapPoint *>::iterator vit = mCurrentFrame.mvpMapPoints.begin(),
@@ -3475,6 +3622,25 @@ void Tracking::UpdateLocalKeyFrames() {
   }
 }
 
+/**
+ * @brief Attempts to relocalize the camera pose when tracking is lost.
+ *
+ * This function is called when the tracking is lost and tries to recover the
+ * camera pose by searching for keyframe candidates in the keyframe database
+ * that match the current frame. It performs the following steps:
+ *   1. Computes the Bag of Words (BoW) vector for the current frame.
+ *   2. Queries the keyframe database for relocalization candidates.
+ *   3. For each candidate keyframe, performs ORB feature matching using BoW.
+ *   4. Sets up a PnP solver for candidates with enough matches.
+ *   5. Runs RANSAC iterations to estimate the camera pose.
+ *   6. If a pose is found, optimizes it and refines matches by searching for
+ * additional correspondences.
+ *   7. If the pose is supported by enough inliers, relocalization is considered
+ * successful.
+ *
+ * @return true if relocalization is successful and the camera pose is
+ * recovered, false otherwise.
+ */
 bool Tracking::Relocalization() {
   Verbose::PrintMess("Starting relocalization", Verbose::VERBOSITY_NORMAL);
   // Compute Bag of Words Vector
