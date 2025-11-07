@@ -2002,11 +2002,14 @@ void Tracking::Track() {
         }
 
         if (!bOK) {
-          if (mCurrentFrame.mnId <= (mnLastRelocFrameId + mnFramesToResetIMU) &&
-              (mSensor == System::IMU_MONOCULAR ||
-               mSensor == System::IMU_STEREO || mSensor == System::IMU_RGBD)) {
-            mState = LOST;
-          } else if (pCurrentMap->KeyFramesInMap() > 10) {
+          // if (mCurrentFrame.mnId <= (mnLastRelocFrameId + mnFramesToResetIMU)
+          // &&
+          //     (mSensor == System::IMU_MONOCULAR ||
+          //      mSensor == System::IMU_STEREO || mSensor == System::IMU_RGBD))
+          //      {
+          //   mState = LOST;
+          //} else if (pCurrentMap->KeyFramesInMap() > 10) {
+          if (pCurrentMap->KeyFramesInMap() > 10) {
             // cout << "KF in map: " << pCurrentMap->KeyFramesInMap() << endl;
             mState = RECENTLY_LOST;
             mTimeStampLost = mCurrentFrame.mTimeStamp;
@@ -2021,8 +2024,10 @@ void Tracking::Track() {
                              Verbose::VERBOSITY_NORMAL);
 
           bOK = true;
-          if ((mSensor == System::IMU_MONOCULAR ||
-               mSensor == System::IMU_STEREO || mSensor == System::IMU_RGBD)) {
+          // if ((mSensor == System::IMU_MONOCULAR ||
+          //      mSensor == System::IMU_STEREO || mSensor == System::IMU_RGBD))
+          //      {
+          if (false) { // exclude for the moment IMU
             if (pCurrentMap->isImuInitialized())
               PredictStateIMU();
             else
@@ -2037,6 +2042,10 @@ void Tracking::Track() {
           } else {
             // Relocalization
             bOK = Relocalization();
+            if (bOK) {
+              Verbose::PrintMess("Relocalisation succeeded",
+                                 Verbose::VERBOSITY_NORMAL);
+            }
             // std::cout << "mCurrentFrame.mTimeStamp:" <<
             // to_string(mCurrentFrame.mTimeStamp) << std::endl; std::cout <<
             // "mTimeStampLost:" << to_string(mTimeStampLost) << std::endl;
@@ -2164,8 +2173,11 @@ void Tracking::Track() {
     if (bOK)
       mState = OK;
     else if (mState == OK) {
-      if (mSensor == System::IMU_MONOCULAR || mSensor == System::IMU_STEREO ||
-          mSensor == System::IMU_RGBD) {
+      if (false) {
+        // exclude for the moment IMU
+        // if (mSensor == System::IMU_MONOCULAR || mSensor == System::IMU_STEREO
+        // ||
+        //     mSensor == System::IMU_RGBD) {
         Verbose::PrintMess("Track lost for less than one second...",
                            Verbose::VERBOSITY_NORMAL);
         if (!pCurrentMap->isImuInitialized() ||
@@ -2268,9 +2280,10 @@ void Tracking::Track() {
       if (bNeedKF && (bOK || (mInsertKFsLost && mState == RECENTLY_LOST &&
                               (mSensor == System::IMU_MONOCULAR ||
                                mSensor == System::IMU_STEREO ||
-                               mSensor == System::IMU_RGBD))))
+                               mSensor == System::IMU_RGBD)))) {
         CreateNewKeyFrame();
-      mbLastFrameIsKF = true;
+        mbLastFrameIsKF = true;
+      }
 
 #ifdef REGISTER_TIMES
       std::chrono::steady_clock::time_point time_EndNewKF =
