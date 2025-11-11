@@ -52,6 +52,9 @@ Tracking::Tracking(System *pSys, ORBVocabulary *pVoc, FrameDrawer *pFrameDrawer,
       mnInitialFrameId(0), mbCreatedMap(false), mnFirstFrameId(0),
       mpCamera2(nullptr), mpLastKeyFrame(static_cast<KeyFrame *>(NULL)) {
   // Load camera parameters from settings file
+  // Default IMU flags
+  mUseImuPose = false;
+  mUseImuTrajectory = true;
   if (settings) {
     newParameterLoader(settings);
   } else {
@@ -1360,6 +1363,26 @@ bool Tracking::ParseIMUParamFile(cv::FileStorage &fSettings) {
   if (mFastInit)
     cout << "Fast IMU initialization. Acceleration is not checked \n";
 
+  // Read optional flag to use IMU pose (from settings) and optionally use IMU
+  // trajectory
+  node = fSettings["IMU.UseImuPose"];
+  mUseImuPose = false;
+  if (!node.empty()) {
+    if (node.isInt())
+      mUseImuPose = (bool)node.operator int();
+    else
+      mUseImuPose = static_cast<int>(fSettings["IMU.UseImuPose"]) != 0;
+  }
+
+  node = fSettings["IMU.UseImuTrajectory"];
+  mUseImuTrajectory = true;
+  if (!node.empty()) {
+    if (node.isInt())
+      mUseImuTrajectory = (bool)node.operator int();
+    else
+      mUseImuTrajectory = static_cast<int>(fSettings["IMU.UseImuTrajectory"]) != 0;
+  }
+
   if (b_miss_params) {
     return false;
   }
@@ -1371,6 +1394,9 @@ bool Tracking::ParseIMUParamFile(cv::FileStorage &fSettings) {
   cout << "IMU gyro walk: " << Ngw << " rad/s^2/sqrt(Hz)" << endl;
   cout << "IMU accelerometer noise: " << Na << " m/s^2/sqrt(Hz)" << endl;
   cout << "IMU accelerometer walk: " << Naw << " m/s^3/sqrt(Hz)" << endl;
+  cout << "IMU.UseImuPose: " << (mUseImuPose ? "true" : "false") << std::endl;
+  cout << "IMU.UseImuTrajectory: " << (mUseImuTrajectory ? "true" : "false")
+    << std::endl;
 
   mpImuCalib = new IMU::Calib(Tbc, Ng * sf, Na * sf, Ngw / sf, Naw / sf);
 

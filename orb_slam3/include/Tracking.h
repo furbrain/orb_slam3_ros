@@ -296,6 +296,8 @@ protected:
     float mImuFreq;
     double mImuPer;
     bool mInsertKFsLost;
+    bool mUseImuPose;
+    bool mUseImuTrajectory;
 
     //New KeyFrame rules (according to fps)
     int mMinFrames;
