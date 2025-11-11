@@ -32,6 +32,8 @@
 #include "Pinhole.h"
 
 #include <iostream>
+#include <sstream>
+#include <iomanip>
 
 #include <chrono>
 #include <mutex>
@@ -39,6 +41,7 @@
 using namespace std;
 
 namespace ORB_SLAM3 {
+
 
 Tracking::Tracking(System *pSys, ORBVocabulary *pVoc, FrameDrawer *pFrameDrawer,
                    Atlas *pAtlas, KeyFrameDatabase *pKFDB,
@@ -62,15 +65,13 @@ Tracking::Tracking(System *pSys, ORBVocabulary *pVoc, FrameDrawer *pFrameDrawer,
 
     bool b_parse_cam = ParseCamParamFile(fSettings);
     if (!b_parse_cam) {
-      std::cout << "*Error with the camera parameters in the config file*"
-                << std::endl;
+      VerboseStream(Verbose::VERBOSITY_NORMAL) << "*Error with the camera parameters in the config file*" << std::endl;
     }
 
     // Load ORB parameters
     bool b_parse_orb = ParseORBParamFile(fSettings);
     if (!b_parse_orb) {
-      std::cout << "*Error with the ORB parameters in the config file*"
-                << std::endl;
+      VerboseStream(Verbose::VERBOSITY_NORMAL) << "*Error with the ORB parameters in the config file*" << std::endl;
     }
 
     bool b_parse_imu = true;
@@ -78,16 +79,14 @@ Tracking::Tracking(System *pSys, ORBVocabulary *pVoc, FrameDrawer *pFrameDrawer,
         sensor == System::IMU_RGBD) {
       b_parse_imu = ParseIMUParamFile(fSettings);
       if (!b_parse_imu) {
-        std::cout << "*Error with the IMU parameters in the config file*"
-                  << std::endl;
+        VerboseStream(Verbose::VERBOSITY_NORMAL) << "*Error with the IMU parameters in the config file*" << std::endl;
       }
 
       mnFramesToResetIMU = mMaxFrames;
     }
 
     if (!b_parse_cam || !b_parse_orb || !b_parse_imu) {
-      std::cerr << "**ERROR in the config file, the format is not correct**"
-                << std::endl;
+      VerboseStream(Verbose::VERBOSITY_QUIET) << "**ERROR in the config file, the format is not correct**" << std::endl;
       try {
         throw -1;
       } catch (exception &e) {
@@ -104,7 +103,7 @@ Tracking::Tracking(System *pSys, ORBVocabulary *pVoc, FrameDrawer *pFrameDrawer,
 
     cv::FileStorage fSettings(strSettingPath, cv::FileStorage::READ);
 
-    std::cout << "Rotate world frame by (rad): ";
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "Rotate world frame by (rad): ";
     for (int i = 0; i < 3; i++) {
       cv::FileNode node = fSettings["WorldRPY." + strAngleNames[i]];
       if (!node.empty() && node.isReal()) {
@@ -112,9 +111,9 @@ Tracking::Tracking(System *pSys, ORBVocabulary *pVoc, FrameDrawer *pFrameDrawer,
       } else {
         dWorldRPY[i] = 0;
       }
-      std::cout << strAngleNames[i] << " " << dWorldRPY[i] << " ";
+      VerboseStream(Verbose::VERBOSITY_NORMAL) << strAngleNames[i] << " " << dWorldRPY[i] << " ";
     }
-    std::cout << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << std::endl;
 
     Eigen::AngleAxisf AngleR(dWorldRPY[0], Eigen::Vector3f::UnitX());
     Eigen::AngleAxisf AngleP(dWorldRPY[1], Eigen::Vector3f::UnitY());
@@ -132,16 +131,15 @@ Tracking::Tracking(System *pSys, ORBVocabulary *pVoc, FrameDrawer *pFrameDrawer,
   mnNumDataset = 0;
 
   vector<GeometricCamera *> vpCams = mpAtlas->GetAllCameras();
-  std::cout << "There are " << vpCams.size() << " cameras in the atlas"
-            << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "There are " << vpCams.size() << " cameras in the atlas" << std::endl;
   for (GeometricCamera *pCam : vpCams) {
-    std::cout << "Camera " << pCam->GetId();
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "Camera " << pCam->GetId();
     if (pCam->GetType() == GeometricCamera::CAM_PINHOLE) {
-      std::cout << " is pinhole" << std::endl;
+      VerboseStream(Verbose::VERBOSITY_NORMAL) << " is pinhole" << std::endl;
     } else if (pCam->GetType() == GeometricCamera::CAM_FISHEYE) {
-      std::cout << " is fisheye" << std::endl;
+      VerboseStream(Verbose::VERBOSITY_NORMAL) << " is fisheye" << std::endl;
     } else {
-      std::cout << " is unknown" << std::endl;
+      VerboseStream(Verbose::VERBOSITY_NORMAL) << " is unknown" << std::endl;
     }
   }
 
@@ -289,20 +287,20 @@ void Tracking::PrintTimeStats() {
   f.open("ExecMean.txt");
   f << fixed;
   // Report the mean and std of each one
-  std::cout << std::endl << " TIME STATS in ms (mean$\\pm$std)" << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << std::endl << " TIME STATS in ms (mean$\\pm$std)" << std::endl;
   f << " TIME STATS in ms (mean$\\pm$std)" << std::endl;
-  cout << "OpenCV version: " << CV_VERSION << endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "OpenCV version: " << CV_VERSION << std::endl;
   f << "OpenCV version: " << CV_VERSION << endl;
-  std::cout << "---------------------------" << std::endl;
-  std::cout << "Tracking" << std::setprecision(5) << std::endl << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "---------------------------" << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "Tracking" << std::setprecision(5) << std::endl << std::endl;
   f << "---------------------------" << std::endl;
   f << "Tracking" << std::setprecision(5) << std::endl << std::endl;
   double average, deviation;
   if (!vdRectStereo_ms.empty()) {
     average = calcAverage(vdRectStereo_ms);
     deviation = calcDeviation(vdRectStereo_ms, average);
-    std::cout << "Stereo Rectification: " << average << "$\\pm$" << deviation
-              << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "Stereo Rectification: " << average << "$\\pm$" << deviation
+        << std::endl;
     f << "Stereo Rectification: " << average << "$\\pm$" << deviation
       << std::endl;
   }
@@ -310,133 +308,133 @@ void Tracking::PrintTimeStats() {
   if (!vdResizeImage_ms.empty()) {
     average = calcAverage(vdResizeImage_ms);
     deviation = calcDeviation(vdResizeImage_ms, average);
-    std::cout << "Image Resize: " << average << "$\\pm$" << deviation
-              << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "Image Resize: " << average << "$\\pm$" << deviation
+        << std::endl;
     f << "Image Resize: " << average << "$\\pm$" << deviation << std::endl;
   }
 
   average = calcAverage(vdORBExtract_ms);
   deviation = calcDeviation(vdORBExtract_ms, average);
-  std::cout << "ORB Extraction: " << average << "$\\pm$" << deviation
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "ORB Extraction: " << average << "$\\pm$" << deviation
             << std::endl;
   f << "ORB Extraction: " << average << "$\\pm$" << deviation << std::endl;
 
   if (!vdStereoMatch_ms.empty()) {
     average = calcAverage(vdStereoMatch_ms);
     deviation = calcDeviation(vdStereoMatch_ms, average);
-    std::cout << "Stereo Matching: " << average << "$\\pm$" << deviation
-              << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "Stereo Matching: " << average << "$\\pm$" << deviation
+        << std::endl;
     f << "Stereo Matching: " << average << "$\\pm$" << deviation << std::endl;
   }
 
   if (!vdIMUInteg_ms.empty()) {
     average = calcAverage(vdIMUInteg_ms);
     deviation = calcDeviation(vdIMUInteg_ms, average);
-    std::cout << "IMU Preintegration: " << average << "$\\pm$" << deviation
-              << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "IMU Preintegration: " << average << "$\\pm$" << deviation
+        << std::endl;
     f << "IMU Preintegration: " << average << "$\\pm$" << deviation
       << std::endl;
   }
 
   average = calcAverage(vdPosePred_ms);
   deviation = calcDeviation(vdPosePred_ms, average);
-  std::cout << "Pose Prediction: " << average << "$\\pm$" << deviation
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "Pose Prediction: " << average << "$\\pm$" << deviation
             << std::endl;
   f << "Pose Prediction: " << average << "$\\pm$" << deviation << std::endl;
 
   average = calcAverage(vdLMTrack_ms);
   deviation = calcDeviation(vdLMTrack_ms, average);
-  std::cout << "LM Track: " << average << "$\\pm$" << deviation << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "LM Track: " << average << "$\\pm$" << deviation << std::endl;
   f << "LM Track: " << average << "$\\pm$" << deviation << std::endl;
 
   average = calcAverage(vdNewKF_ms);
   deviation = calcDeviation(vdNewKF_ms, average);
-  std::cout << "New KF decision: " << average << "$\\pm$" << deviation
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "New KF decision: " << average << "$\\pm$" << deviation
             << std::endl;
   f << "New KF decision: " << average << "$\\pm$" << deviation << std::endl;
 
   average = calcAverage(vdTrackTotal_ms);
   deviation = calcDeviation(vdTrackTotal_ms, average);
-  std::cout << "Total Tracking: " << average << "$\\pm$" << deviation
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "Total Tracking: " << average << "$\\pm$" << deviation
             << std::endl;
   f << "Total Tracking: " << average << "$\\pm$" << deviation << std::endl;
 
   // Local Mapping time stats
-  std::cout << std::endl << std::endl << std::endl;
-  std::cout << "Local Mapping" << std::endl << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << std::endl << std::endl << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "Local Mapping" << std::endl << std::endl;
   f << std::endl << "Local Mapping" << std::endl << std::endl;
 
   average = calcAverage(mpLocalMapper->vdKFInsert_ms);
   deviation = calcDeviation(mpLocalMapper->vdKFInsert_ms, average);
-  std::cout << "KF Insertion: " << average << "$\\pm$" << deviation
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "KF Insertion: " << average << "$\\pm$" << deviation
             << std::endl;
   f << "KF Insertion: " << average << "$\\pm$" << deviation << std::endl;
 
   average = calcAverage(mpLocalMapper->vdMPCulling_ms);
   deviation = calcDeviation(mpLocalMapper->vdMPCulling_ms, average);
-  std::cout << "MP Culling: " << average << "$\\pm$" << deviation << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "MP Culling: " << average << "$\\pm$" << deviation << std::endl;
   f << "MP Culling: " << average << "$\\pm$" << deviation << std::endl;
 
   average = calcAverage(mpLocalMapper->vdMPCreation_ms);
   deviation = calcDeviation(mpLocalMapper->vdMPCreation_ms, average);
-  std::cout << "MP Creation: " << average << "$\\pm$" << deviation << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "MP Creation: " << average << "$\\pm$" << deviation << std::endl;
   f << "MP Creation: " << average << "$\\pm$" << deviation << std::endl;
 
   average = calcAverage(mpLocalMapper->vdLBA_ms);
   deviation = calcDeviation(mpLocalMapper->vdLBA_ms, average);
-  std::cout << "LBA: " << average << "$\\pm$" << deviation << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "LBA: " << average << "$\\pm$" << deviation << std::endl;
   f << "LBA: " << average << "$\\pm$" << deviation << std::endl;
 
   average = calcAverage(mpLocalMapper->vdKFCulling_ms);
   deviation = calcDeviation(mpLocalMapper->vdKFCulling_ms, average);
-  std::cout << "KF Culling: " << average << "$\\pm$" << deviation << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "KF Culling: " << average << "$\\pm$" << deviation << std::endl;
   f << "KF Culling: " << average << "$\\pm$" << deviation << std::endl;
 
   average = calcAverage(mpLocalMapper->vdLMTotal_ms);
   deviation = calcDeviation(mpLocalMapper->vdLMTotal_ms, average);
-  std::cout << "Total Local Mapping: " << average << "$\\pm$" << deviation
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "Total Local Mapping: " << average << "$\\pm$" << deviation
             << std::endl;
   f << "Total Local Mapping: " << average << "$\\pm$" << deviation << std::endl;
 
   // Local Mapping LBA complexity
-  std::cout << "---------------------------" << std::endl;
-  std::cout << std::endl << "LBA complexity (mean$\\pm$std)" << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "---------------------------" << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << std::endl << "LBA complexity (mean$\\pm$std)" << std::endl;
   f << "---------------------------" << std::endl;
   f << std::endl << "LBA complexity (mean$\\pm$std)" << std::endl;
 
   average = calcAverage(mpLocalMapper->vnLBA_edges);
   deviation = calcDeviation(mpLocalMapper->vnLBA_edges, average);
-  std::cout << "LBA Edges: " << average << "$\\pm$" << deviation << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "LBA Edges: " << average << "$\\pm$" << deviation << std::endl;
   f << "LBA Edges: " << average << "$\\pm$" << deviation << std::endl;
 
   average = calcAverage(mpLocalMapper->vnLBA_KFopt);
   deviation = calcDeviation(mpLocalMapper->vnLBA_KFopt, average);
-  std::cout << "LBA KF optimized: " << average << "$\\pm$" << deviation
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "LBA KF optimized: " << average << "$\\pm$" << deviation
             << std::endl;
   f << "LBA KF optimized: " << average << "$\\pm$" << deviation << std::endl;
 
   average = calcAverage(mpLocalMapper->vnLBA_KFfixed);
   deviation = calcDeviation(mpLocalMapper->vnLBA_KFfixed, average);
-  std::cout << "LBA KF fixed: " << average << "$\\pm$" << deviation
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "LBA KF fixed: " << average << "$\\pm$" << deviation
             << std::endl;
   f << "LBA KF fixed: " << average << "$\\pm$" << deviation << std::endl;
 
   average = calcAverage(mpLocalMapper->vnLBA_MPs);
   deviation = calcDeviation(mpLocalMapper->vnLBA_MPs, average);
-  std::cout << "LBA MP: " << average << "$\\pm$" << deviation << std::endl
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "LBA MP: " << average << "$\\pm$" << deviation << std::endl
             << std::endl;
   f << "LBA MP: " << average << "$\\pm$" << deviation << std::endl << std::endl;
 
-  std::cout << "LBA executions: " << mpLocalMapper->nLBA_exec << std::endl;
-  std::cout << "LBA aborts: " << mpLocalMapper->nLBA_abort << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "LBA executions: " << mpLocalMapper->nLBA_exec << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "LBA aborts: " << mpLocalMapper->nLBA_abort << std::endl;
   f << "LBA executions: " << mpLocalMapper->nLBA_exec << std::endl;
   f << "LBA aborts: " << mpLocalMapper->nLBA_abort << std::endl;
 
   // Map complexity
-  std::cout << "---------------------------" << std::endl;
-  std::cout << std::endl << "Map complexity" << std::endl;
-  std::cout << "KFs in map: " << mpAtlas->GetAllKeyFrames().size() << std::endl;
-  std::cout << "MPs in map: " << mpAtlas->GetAllMapPoints().size() << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "---------------------------" << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << std::endl << "Map complexity" << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "KFs in map: " << mpAtlas->GetAllKeyFrames().size() << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "MPs in map: " << mpAtlas->GetAllMapPoints().size() << std::endl;
   f << "---------------------------" << std::endl;
   f << std::endl << "Map complexity" << std::endl;
   vector<Map *> vpMaps = mpAtlas->GetAllMaps();
@@ -453,121 +451,121 @@ void Tracking::PrintTimeStats() {
 
   f << "---------------------------" << std::endl;
   f << std::endl << "Place Recognition (mean$\\pm$std)" << std::endl;
-  std::cout << "---------------------------" << std::endl;
-  std::cout << std::endl << "Place Recognition (mean$\\pm$std)" << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "---------------------------" << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << std::endl << "Place Recognition (mean$\\pm$std)" << std::endl;
   average = calcAverage(mpLoopClosing->vdDataQuery_ms);
   deviation = calcDeviation(mpLoopClosing->vdDataQuery_ms, average);
   f << "Database Query: " << average << "$\\pm$" << deviation << std::endl;
-  std::cout << "Database Query: " << average << "$\\pm$" << deviation
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "Database Query: " << average << "$\\pm$" << deviation
             << std::endl;
   average = calcAverage(mpLoopClosing->vdEstSim3_ms);
   deviation = calcDeviation(mpLoopClosing->vdEstSim3_ms, average);
   f << "SE3 estimation: " << average << "$\\pm$" << deviation << std::endl;
-  std::cout << "SE3 estimation: " << average << "$\\pm$" << deviation
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "SE3 estimation: " << average << "$\\pm$" << deviation
             << std::endl;
   average = calcAverage(mpLoopClosing->vdPRTotal_ms);
   deviation = calcDeviation(mpLoopClosing->vdPRTotal_ms, average);
   f << "Total Place Recognition: " << average << "$\\pm$" << deviation
     << std::endl
     << std::endl;
-  std::cout << "Total Place Recognition: " << average << "$\\pm$" << deviation
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "Total Place Recognition: " << average << "$\\pm$" << deviation
             << std::endl
             << std::endl;
 
   f << std::endl << "Loop Closing (mean$\\pm$std)" << std::endl;
-  std::cout << std::endl << "Loop Closing (mean$\\pm$std)" << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << std::endl << "Loop Closing (mean$\\pm$std)" << std::endl;
   average = calcAverage(mpLoopClosing->vdLoopFusion_ms);
   deviation = calcDeviation(mpLoopClosing->vdLoopFusion_ms, average);
   f << "Loop Fusion: " << average << "$\\pm$" << deviation << std::endl;
-  std::cout << "Loop Fusion: " << average << "$\\pm$" << deviation << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "Loop Fusion: " << average << "$\\pm$" << deviation << std::endl;
   average = calcAverage(mpLoopClosing->vdLoopOptEss_ms);
   deviation = calcDeviation(mpLoopClosing->vdLoopOptEss_ms, average);
   f << "Essential Graph: " << average << "$\\pm$" << deviation << std::endl;
-  std::cout << "Essential Graph: " << average << "$\\pm$" << deviation
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "Essential Graph: " << average << "$\\pm$" << deviation
             << std::endl;
   average = calcAverage(mpLoopClosing->vdLoopTotal_ms);
   deviation = calcDeviation(mpLoopClosing->vdLoopTotal_ms, average);
   f << "Total Loop Closing: " << average << "$\\pm$" << deviation << std::endl
     << std::endl;
-  std::cout << "Total Loop Closing: " << average << "$\\pm$" << deviation
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "Total Loop Closing: " << average << "$\\pm$" << deviation
             << std::endl
             << std::endl;
 
   f << "Numb exec: " << mpLoopClosing->nLoop << std::endl;
-  std::cout << "Num exec: " << mpLoopClosing->nLoop << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "Num exec: " << mpLoopClosing->nLoop << std::endl;
   average = calcAverage(mpLoopClosing->vnLoopKFs);
   deviation = calcDeviation(mpLoopClosing->vnLoopKFs, average);
   f << "Number of KFs: " << average << "$\\pm$" << deviation << std::endl;
-  std::cout << "Number of KFs: " << average << "$\\pm$" << deviation
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "Number of KFs: " << average << "$\\pm$" << deviation
             << std::endl;
 
   f << std::endl << "Map Merging (mean$\\pm$std)" << std::endl;
-  std::cout << std::endl << "Map Merging (mean$\\pm$std)" << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << std::endl << "Map Merging (mean$\\pm$std)" << std::endl;
   average = calcAverage(mpLoopClosing->vdMergeMaps_ms);
   deviation = calcDeviation(mpLoopClosing->vdMergeMaps_ms, average);
   f << "Merge Maps: " << average << "$\\pm$" << deviation << std::endl;
-  std::cout << "Merge Maps: " << average << "$\\pm$" << deviation << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "Merge Maps: " << average << "$\\pm$" << deviation << std::endl;
   average = calcAverage(mpLoopClosing->vdWeldingBA_ms);
   deviation = calcDeviation(mpLoopClosing->vdWeldingBA_ms, average);
   f << "Welding BA: " << average << "$\\pm$" << deviation << std::endl;
-  std::cout << "Welding BA: " << average << "$\\pm$" << deviation << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "Welding BA: " << average << "$\\pm$" << deviation << std::endl;
   average = calcAverage(mpLoopClosing->vdMergeOptEss_ms);
   deviation = calcDeviation(mpLoopClosing->vdMergeOptEss_ms, average);
   f << "Optimization Ess.: " << average << "$\\pm$" << deviation << std::endl;
-  std::cout << "Optimization Ess.: " << average << "$\\pm$" << deviation
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "Optimization Ess.: " << average << "$\\pm$" << deviation
             << std::endl;
   average = calcAverage(mpLoopClosing->vdMergeTotal_ms);
   deviation = calcDeviation(mpLoopClosing->vdMergeTotal_ms, average);
   f << "Total Map Merging: " << average << "$\\pm$" << deviation << std::endl
     << std::endl;
-  std::cout << "Total Map Merging: " << average << "$\\pm$" << deviation
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "Total Map Merging: " << average << "$\\pm$" << deviation
             << std::endl
             << std::endl;
 
   f << "Numb exec: " << mpLoopClosing->nMerges << std::endl;
-  std::cout << "Num exec: " << mpLoopClosing->nMerges << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "Num exec: " << mpLoopClosing->nMerges << std::endl;
   average = calcAverage(mpLoopClosing->vnMergeKFs);
   deviation = calcDeviation(mpLoopClosing->vnMergeKFs, average);
   f << "Number of KFs: " << average << "$\\pm$" << deviation << std::endl;
-  std::cout << "Number of KFs: " << average << "$\\pm$" << deviation
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "Number of KFs: " << average << "$\\pm$" << deviation
             << std::endl;
   average = calcAverage(mpLoopClosing->vnMergeMPs);
   deviation = calcDeviation(mpLoopClosing->vnMergeMPs, average);
   f << "Number of MPs: " << average << "$\\pm$" << deviation << std::endl;
-  std::cout << "Number of MPs: " << average << "$\\pm$" << deviation
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "Number of MPs: " << average << "$\\pm$" << deviation
             << std::endl;
 
   f << std::endl << "Full GBA (mean$\\pm$std)" << std::endl;
-  std::cout << std::endl << "Full GBA (mean$\\pm$std)" << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << std::endl << "Full GBA (mean$\\pm$std)" << std::endl;
   average = calcAverage(mpLoopClosing->vdGBA_ms);
   deviation = calcDeviation(mpLoopClosing->vdGBA_ms, average);
   f << "GBA: " << average << "$\\pm$" << deviation << std::endl;
-  std::cout << "GBA: " << average << "$\\pm$" << deviation << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "GBA: " << average << "$\\pm$" << deviation << std::endl;
   average = calcAverage(mpLoopClosing->vdUpdateMap_ms);
   deviation = calcDeviation(mpLoopClosing->vdUpdateMap_ms, average);
   f << "Map Update: " << average << "$\\pm$" << deviation << std::endl;
-  std::cout << "Map Update: " << average << "$\\pm$" << deviation << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "Map Update: " << average << "$\\pm$" << deviation << std::endl;
   average = calcAverage(mpLoopClosing->vdFGBATotal_ms);
   deviation = calcDeviation(mpLoopClosing->vdFGBATotal_ms, average);
   f << "Total Full GBA: " << average << "$\\pm$" << deviation << std::endl
     << std::endl;
-  std::cout << "Total Full GBA: " << average << "$\\pm$" << deviation
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "Total Full GBA: " << average << "$\\pm$" << deviation
             << std::endl
             << std::endl;
 
   f << "Numb exec: " << mpLoopClosing->nFGBA_exec << std::endl;
-  std::cout << "Num exec: " << mpLoopClosing->nFGBA_exec << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "Num exec: " << mpLoopClosing->nFGBA_exec << std::endl;
   f << "Numb abort: " << mpLoopClosing->nFGBA_abort << std::endl;
-  std::cout << "Num abort: " << mpLoopClosing->nFGBA_abort << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "Num abort: " << mpLoopClosing->nFGBA_abort << std::endl;
   average = calcAverage(mpLoopClosing->vnGBAKFs);
   deviation = calcDeviation(mpLoopClosing->vnGBAKFs, average);
   f << "Number of KFs: " << average << "$\\pm$" << deviation << std::endl;
-  std::cout << "Number of KFs: " << average << "$\\pm$" << deviation
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "Number of KFs: " << average << "$\\pm$" << deviation
             << std::endl;
   average = calcAverage(mpLoopClosing->vnGBAMPs);
   deviation = calcDeviation(mpLoopClosing->vnGBAMPs, average);
   f << "Number of MPs: " << average << "$\\pm$" << deviation << std::endl;
-  std::cout << "Number of MPs: " << average << "$\\pm$" << deviation
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "Number of MPs: " << average << "$\\pm$" << deviation
             << std::endl;
 
   f.close();
@@ -670,7 +668,7 @@ void Tracking::newParameterLoader(Settings *settings) {
 
 bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings) {
   mDistCoef = cv::Mat::zeros(4, 1, CV_32F);
-  cout << endl << "Camera Parameters: " << endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << std::endl << "Camera Parameters: " << std::endl;
   bool b_miss_params = false;
 
   string sCameraName = fSettings["Camera.type"];
@@ -683,8 +681,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings) {
     if (!node.empty() && node.isReal()) {
       fx = node.real();
     } else {
-      std::cerr << "*Camera.fx parameter doesn't exist or is not a real number*"
-                << std::endl;
+      VerboseStream(Verbose::VERBOSITY_QUIET) << "*Camera.fx parameter doesn't exist or is not a real number*" << std::endl;
       b_miss_params = true;
     }
 
@@ -692,8 +689,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings) {
     if (!node.empty() && node.isReal()) {
       fy = node.real();
     } else {
-      std::cerr << "*Camera.fy parameter doesn't exist or is not a real number*"
-                << std::endl;
+      VerboseStream(Verbose::VERBOSITY_QUIET) << "*Camera.fy parameter doesn't exist or is not a real number*" << std::endl;
       b_miss_params = true;
     }
 
@@ -701,8 +697,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings) {
     if (!node.empty() && node.isReal()) {
       cx = node.real();
     } else {
-      std::cerr << "*Camera.cx parameter doesn't exist or is not a real number*"
-                << std::endl;
+      VerboseStream(Verbose::VERBOSITY_QUIET) << "*Camera.cx parameter doesn't exist or is not a real number*" << std::endl;
       b_miss_params = true;
     }
 
@@ -710,8 +705,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings) {
     if (!node.empty() && node.isReal()) {
       cy = node.real();
     } else {
-      std::cerr << "*Camera.cy parameter doesn't exist or is not a real number*"
-                << std::endl;
+      VerboseStream(Verbose::VERBOSITY_QUIET) << "*Camera.cy parameter doesn't exist or is not a real number*" << std::endl;
       b_miss_params = true;
     }
 
@@ -720,8 +714,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings) {
     if (!node.empty() && node.isReal()) {
       mDistCoef.at<float>(0) = node.real();
     } else {
-      std::cerr << "*Camera.k1 parameter doesn't exist or is not a real number*"
-                << std::endl;
+      VerboseStream(Verbose::VERBOSITY_QUIET) << "*Camera.k1 parameter doesn't exist or is not a real number*" << std::endl;
       b_miss_params = true;
     }
 
@@ -729,8 +722,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings) {
     if (!node.empty() && node.isReal()) {
       mDistCoef.at<float>(1) = node.real();
     } else {
-      std::cerr << "*Camera.k2 parameter doesn't exist or is not a real number*"
-                << std::endl;
+      VerboseStream(Verbose::VERBOSITY_QUIET) << "*Camera.k2 parameter doesn't exist or is not a real number*" << std::endl;
       b_miss_params = true;
     }
 
@@ -738,8 +730,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings) {
     if (!node.empty() && node.isReal()) {
       mDistCoef.at<float>(2) = node.real();
     } else {
-      std::cerr << "*Camera.p1 parameter doesn't exist or is not a real number*"
-                << std::endl;
+      VerboseStream(Verbose::VERBOSITY_QUIET) << "*Camera.p1 parameter doesn't exist or is not a real number*" << std::endl;
       b_miss_params = true;
     }
 
@@ -747,8 +738,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings) {
     if (!node.empty() && node.isReal()) {
       mDistCoef.at<float>(3) = node.real();
     } else {
-      std::cerr << "*Camera.p2 parameter doesn't exist or is not a real number*"
-                << std::endl;
+      VerboseStream(Verbose::VERBOSITY_QUIET) << "*Camera.p2 parameter doesn't exist or is not a real number*" << std::endl;
       b_miss_params = true;
     }
 
@@ -781,20 +771,20 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings) {
 
     mpCamera = mpAtlas->AddCamera(mpCamera);
 
-    std::cout << "- Camera: Pinhole" << std::endl;
-    std::cout << "- Image scale: " << mImageScale << std::endl;
-    std::cout << "- fx: " << fx << std::endl;
-    std::cout << "- fy: " << fy << std::endl;
-    std::cout << "- cx: " << cx << std::endl;
-    std::cout << "- cy: " << cy << std::endl;
-    std::cout << "- k1: " << mDistCoef.at<float>(0) << std::endl;
-    std::cout << "- k2: " << mDistCoef.at<float>(1) << std::endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "- Camera: Pinhole" << std::endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "- Image scale: " << mImageScale << std::endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "- fx: " << fx << std::endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "- fy: " << fy << std::endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "- cx: " << cx << std::endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "- cy: " << cy << std::endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "- k1: " << mDistCoef.at<float>(0) << std::endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "- k2: " << mDistCoef.at<float>(1) << std::endl;
 
-    std::cout << "- p1: " << mDistCoef.at<float>(2) << std::endl;
-    std::cout << "- p2: " << mDistCoef.at<float>(3) << std::endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "- p1: " << mDistCoef.at<float>(2) << std::endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "- p2: " << mDistCoef.at<float>(3) << std::endl;
 
     if (mDistCoef.rows == 5)
-      std::cout << "- k3: " << mDistCoef.at<float>(4) << std::endl;
+      VerboseStream(Verbose::VERBOSITY_NORMAL) << "- k3: " << mDistCoef.at<float>(4) << std::endl;
 
     mK = cv::Mat::eye(3, 3, CV_32F);
     mK.at<float>(0, 0) = fx;
@@ -817,16 +807,14 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings) {
     if (!node.empty() && node.isReal()) {
       fx = node.real();
     } else {
-      std::cerr << "*Camera.fx parameter doesn't exist or is not a real number*"
-                << std::endl;
+      VerboseStream(Verbose::VERBOSITY_QUIET) << "*Camera.fx parameter doesn't exist or is not a real number*" << std::endl;
       b_miss_params = true;
     }
     node = fSettings["Camera.fy"];
     if (!node.empty() && node.isReal()) {
       fy = node.real();
     } else {
-      std::cerr << "*Camera.fy parameter doesn't exist or is not a real number*"
-                << std::endl;
+  VerboseStream(Verbose::VERBOSITY_QUIET) << "*Camera.fy parameter doesn't exist or is not a real number*" << std::endl;
       b_miss_params = true;
     }
 
@@ -834,8 +822,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings) {
     if (!node.empty() && node.isReal()) {
       cx = node.real();
     } else {
-      std::cerr << "*Camera.cx parameter doesn't exist or is not a real number*"
-                << std::endl;
+  VerboseStream(Verbose::VERBOSITY_QUIET) << "*Camera.cx parameter doesn't exist or is not a real number*" << std::endl;
       b_miss_params = true;
     }
 
@@ -843,8 +830,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings) {
     if (!node.empty() && node.isReal()) {
       cy = node.real();
     } else {
-      std::cerr << "*Camera.cy parameter doesn't exist or is not a real number*"
-                << std::endl;
+  VerboseStream(Verbose::VERBOSITY_QUIET) << "*Camera.cy parameter doesn't exist or is not a real number*" << std::endl;
       b_miss_params = true;
     }
 
@@ -853,16 +839,14 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings) {
     if (!node.empty() && node.isReal()) {
       k1 = node.real();
     } else {
-      std::cerr << "*Camera.k1 parameter doesn't exist or is not a real number*"
-                << std::endl;
+  VerboseStream(Verbose::VERBOSITY_QUIET) << "*Camera.k1 parameter doesn't exist or is not a real number*" << std::endl;
       b_miss_params = true;
     }
     node = fSettings["Camera.k2"];
     if (!node.empty() && node.isReal()) {
       k2 = node.real();
     } else {
-      std::cerr << "*Camera.k2 parameter doesn't exist or is not a real number*"
-                << std::endl;
+  VerboseStream(Verbose::VERBOSITY_QUIET) << "*Camera.k2 parameter doesn't exist or is not a real number*" << std::endl;
       b_miss_params = true;
     }
 
@@ -870,8 +854,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings) {
     if (!node.empty() && node.isReal()) {
       k3 = node.real();
     } else {
-      std::cerr << "*Camera.k3 parameter doesn't exist or is not a real number*"
-                << std::endl;
+  VerboseStream(Verbose::VERBOSITY_QUIET) << "*Camera.k3 parameter doesn't exist or is not a real number*" << std::endl;
       b_miss_params = true;
     }
 
@@ -879,8 +862,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings) {
     if (!node.empty() && node.isReal()) {
       k4 = node.real();
     } else {
-      std::cerr << "*Camera.k4 parameter doesn't exist or is not a real number*"
-                << std::endl;
+  VerboseStream(Verbose::VERBOSITY_QUIET) << "*Camera.k4 parameter doesn't exist or is not a real number*" << std::endl;
       b_miss_params = true;
     }
 
@@ -901,16 +883,16 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings) {
       vector<float> vCamCalib{fx, fy, cx, cy, k1, k2, k3, k4};
       mpCamera = new KannalaBrandt8(vCamCalib);
       mpCamera = mpAtlas->AddCamera(mpCamera);
-      std::cout << "- Camera: Fisheye" << std::endl;
-      std::cout << "- Image scale: " << mImageScale << std::endl;
-      std::cout << "- fx: " << fx << std::endl;
-      std::cout << "- fy: " << fy << std::endl;
-      std::cout << "- cx: " << cx << std::endl;
-      std::cout << "- cy: " << cy << std::endl;
-      std::cout << "- k1: " << k1 << std::endl;
-      std::cout << "- k2: " << k2 << std::endl;
-      std::cout << "- k3: " << k3 << std::endl;
-      std::cout << "- k4: " << k4 << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "- Camera: Fisheye" << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "- Image scale: " << mImageScale << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "- fx: " << fx << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "- fy: " << fy << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "- cx: " << cx << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "- cy: " << cy << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "- k1: " << k1 << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "- k2: " << k2 << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "- k3: " << k3 << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "- k4: " << k4 << std::endl;
 
       mK = cv::Mat::eye(3, 3, CV_32F);
       mK.at<float>(0, 0) = fx;
@@ -933,18 +915,14 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings) {
       if (!node.empty() && node.isReal()) {
         fx = node.real();
       } else {
-        std::cerr
-            << "*Camera2.fx parameter doesn't exist or is not a real number*"
-            << std::endl;
+        VerboseStream(Verbose::VERBOSITY_QUIET) << "*Camera2.fx parameter doesn't exist or is not a real number*" << std::endl;
         b_miss_params = true;
       }
       node = fSettings["Camera2.fy"];
       if (!node.empty() && node.isReal()) {
         fy = node.real();
       } else {
-        std::cerr
-            << "*Camera2.fy parameter doesn't exist or is not a real number*"
-            << std::endl;
+        VerboseStream(Verbose::VERBOSITY_QUIET) << "*Camera2.fy parameter doesn't exist or is not a real number*" << std::endl;
         b_miss_params = true;
       }
 
@@ -952,9 +930,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings) {
       if (!node.empty() && node.isReal()) {
         cx = node.real();
       } else {
-        std::cerr
-            << "*Camera2.cx parameter doesn't exist or is not a real number*"
-            << std::endl;
+        VerboseStream(Verbose::VERBOSITY_QUIET) << "*Camera2.cx parameter doesn't exist or is not a real number*" << std::endl;
         b_miss_params = true;
       }
 
@@ -962,9 +938,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings) {
       if (!node.empty() && node.isReal()) {
         cy = node.real();
       } else {
-        std::cerr
-            << "*Camera2.cy parameter doesn't exist or is not a real number*"
-            << std::endl;
+        VerboseStream(Verbose::VERBOSITY_QUIET) << "*Camera2.cy parameter doesn't exist or is not a real number*" << std::endl;
         b_miss_params = true;
       }
 
@@ -973,18 +947,14 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings) {
       if (!node.empty() && node.isReal()) {
         k1 = node.real();
       } else {
-        std::cerr
-            << "*Camera2.k1 parameter doesn't exist or is not a real number*"
-            << std::endl;
+        VerboseStream(Verbose::VERBOSITY_QUIET) << "*Camera2.k1 parameter doesn't exist or is not a real number*" << std::endl;
         b_miss_params = true;
       }
       node = fSettings["Camera2.k2"];
       if (!node.empty() && node.isReal()) {
         k2 = node.real();
       } else {
-        std::cerr
-            << "*Camera2.k2 parameter doesn't exist or is not a real number*"
-            << std::endl;
+        VerboseStream(Verbose::VERBOSITY_QUIET) << "*Camera2.k2 parameter doesn't exist or is not a real number*" << std::endl;
         b_miss_params = true;
       }
 
@@ -992,9 +962,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings) {
       if (!node.empty() && node.isReal()) {
         k3 = node.real();
       } else {
-        std::cerr
-            << "*Camera2.k3 parameter doesn't exist or is not a real number*"
-            << std::endl;
+        VerboseStream(Verbose::VERBOSITY_QUIET) << "*Camera2.k3 parameter doesn't exist or is not a real number*" << std::endl;
         b_miss_params = true;
       }
 
@@ -1002,9 +970,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings) {
       if (!node.empty() && node.isReal()) {
         k4 = node.real();
       } else {
-        std::cerr
-            << "*Camera2.k4 parameter doesn't exist or is not a real number*"
-            << std::endl;
+        VerboseStream(Verbose::VERBOSITY_QUIET) << "*Camera2.k4 parameter doesn't exist or is not a real number*" << std::endl;
         b_miss_params = true;
       }
 
@@ -1018,29 +984,25 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings) {
       if (!node.empty() && node.isInt()) {
         leftLappingBegin = node.operator int();
       } else {
-        std::cout << "WARNING: Camera.lappingBegin not correctly defined"
-                  << std::endl;
+        VerboseStream(Verbose::VERBOSITY_NORMAL) << "WARNING: Camera.lappingBegin not correctly defined" << std::endl;
       }
       node = fSettings["Camera.lappingEnd"];
       if (!node.empty() && node.isInt()) {
         leftLappingEnd = node.operator int();
       } else {
-        std::cout << "WARNING: Camera.lappingEnd not correctly defined"
-                  << std::endl;
+        VerboseStream(Verbose::VERBOSITY_NORMAL) << "WARNING: Camera.lappingEnd not correctly defined" << std::endl;
       }
       node = fSettings["Camera2.lappingBegin"];
       if (!node.empty() && node.isInt()) {
         rightLappingBegin = node.operator int();
       } else {
-        std::cout << "WARNING: Camera2.lappingBegin not correctly defined"
-                  << std::endl;
+        VerboseStream(Verbose::VERBOSITY_NORMAL) << "WARNING: Camera2.lappingBegin not correctly defined" << std::endl;
       }
       node = fSettings["Camera2.lappingEnd"];
       if (!node.empty() && node.isInt()) {
         rightLappingEnd = node.operator int();
       } else {
-        std::cout << "WARNING: Camera2.lappingEnd not correctly defined"
-                  << std::endl;
+        VerboseStream(Verbose::VERBOSITY_NORMAL) << "WARNING: Camera2.lappingEnd not correctly defined" << std::endl;
       }
 
       node = fSettings["Tlr"];
@@ -1048,12 +1010,11 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings) {
       if (!node.empty()) {
         cvTlr = node.mat();
         if (cvTlr.rows != 3 || cvTlr.cols != 4) {
-          std::cerr << "*Tlr matrix have to be a 3x4 transformation matrix*"
-                    << std::endl;
+          VerboseStream(Verbose::VERBOSITY_QUIET) << "*Tlr matrix have to be a 3x4 transformation matrix*" << std::endl;
           b_miss_params = true;
         }
       } else {
-        std::cerr << "*Tlr matrix doesn't exist*" << std::endl;
+  VerboseStream(Verbose::VERBOSITY_QUIET) << "*Tlr matrix doesn't exist*" << std::endl;
         b_miss_params = true;
       }
 
@@ -1089,25 +1050,23 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings) {
         static_cast<KannalaBrandt8 *>(mpCamera2)->mvLappingArea[1] =
             rightLappingEnd;
 
-        std::cout << "- Camera1 Lapping: " << leftLappingBegin << ", "
-                  << leftLappingEnd << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "- Camera1 Lapping: " << leftLappingBegin << ", " << leftLappingEnd << std::endl;
 
-        std::cout << std::endl << "Camera2 Parameters:" << std::endl;
-        std::cout << "- Camera: Fisheye" << std::endl;
-        std::cout << "- Image scale: " << mImageScale << std::endl;
-        std::cout << "- fx: " << fx << std::endl;
-        std::cout << "- fy: " << fy << std::endl;
-        std::cout << "- cx: " << cx << std::endl;
-        std::cout << "- cy: " << cy << std::endl;
-        std::cout << "- k1: " << k1 << std::endl;
-        std::cout << "- k2: " << k2 << std::endl;
-        std::cout << "- k3: " << k3 << std::endl;
-        std::cout << "- k4: " << k4 << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << std::endl << "Camera2 Parameters:" << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "- Camera: Fisheye" << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "- Image scale: " << mImageScale << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "- fx: " << fx << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "- fy: " << fy << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "- cx: " << cx << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "- cy: " << cy << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "- k1: " << k1 << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "- k2: " << k2 << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "- k3: " << k3 << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "- k4: " << k4 << std::endl;
 
-        std::cout << "- mTlr: \n" << cvTlr << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "- mTlr: \n" << cvTlr << std::endl;
 
-        std::cout << "- Camera2 Lapping: " << rightLappingBegin << ", "
-                  << rightLappingEnd << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "- Camera2 Lapping: " << rightLappingBegin << ", " << rightLappingEnd << std::endl;
       }
     }
 
@@ -1116,9 +1075,8 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings) {
     }
 
   } else {
-    std::cerr << "*Not Supported Camera Sensor*" << std::endl;
-    std::cerr << "Check an example configuration file with the desired sensor"
-              << std::endl;
+    VerboseStream(Verbose::VERBOSITY_QUIET) << "*Not Supported Camera Sensor*" << std::endl;
+    VerboseStream(Verbose::VERBOSITY_QUIET) << "Check an example configuration file with the desired sensor" << std::endl;
   }
 
   if (mSensor == System::STEREO || mSensor == System::RGBD ||
@@ -1130,8 +1088,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings) {
         mbf *= mImageScale;
       }
     } else {
-      std::cerr << "*Camera.bf parameter doesn't exist or is not a real number*"
-                << std::endl;
+      VerboseStream(Verbose::VERBOSITY_QUIET) << "*Camera.bf parameter doesn't exist or is not a real number*" << std::endl;
       b_miss_params = true;
     }
   }
@@ -1144,15 +1101,15 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings) {
   mMinFrames = 0;
   mMaxFrames = fps;
 
-  cout << "- fps: " << fps << endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "- fps: " << fps << std::endl;
 
   int nRGB = fSettings["Camera.RGB"];
   mbRGB = nRGB;
 
   if (mbRGB)
-    cout << "- color order: RGB (ignored if grayscale)" << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "- color order: RGB (ignored if grayscale)" << std::endl;
   else
-    cout << "- color order: BGR (ignored if grayscale)" << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "- color order: BGR (ignored if grayscale)" << std::endl;
 
   if (mSensor == System::STEREO || mSensor == System::RGBD ||
       mSensor == System::IMU_STEREO || mSensor == System::IMU_RGBD) {
@@ -1161,11 +1118,9 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings) {
     if (!node.empty() && node.isReal()) {
       mThDepth = node.real();
       mThDepth = mbf * mThDepth / fx;
-      cout << endl
-           << "Depth Threshold (Close/Far Points): " << mThDepth << endl;
+      VerboseStream(Verbose::VERBOSITY_NORMAL) << std::endl << "Depth Threshold (Close/Far Points): " << mThDepth << std::endl;
     } else {
-      std::cerr << "*ThDepth parameter doesn't exist or is not a real number*"
-                << std::endl;
+      VerboseStream(Verbose::VERBOSITY_QUIET) << "*ThDepth parameter doesn't exist or is not a real number*" << std::endl;
       b_miss_params = true;
     }
   }
@@ -1179,9 +1134,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings) {
       else
         mDepthMapFactor = 1.0f / mDepthMapFactor;
     } else {
-      std::cerr
-          << "*DepthMapFactor parameter doesn't exist or is not a real number*"
-          << std::endl;
+      VerboseStream(Verbose::VERBOSITY_QUIET) << "*DepthMapFactor parameter doesn't exist or is not a real number*" << std::endl;
       b_miss_params = true;
     }
   }
@@ -1202,9 +1155,7 @@ bool Tracking::ParseORBParamFile(cv::FileStorage &fSettings) {
   if (!node.empty() && node.isInt()) {
     nFeatures = node.operator int();
   } else {
-    std::cerr << "*ORBextractor.nFeatures parameter doesn't exist or is not an "
-                 "integer*"
-              << std::endl;
+    VerboseStream(Verbose::VERBOSITY_QUIET) << "*ORBextractor.nFeatures parameter doesn't exist or is not an integer*" << std::endl;
     b_miss_params = true;
   }
 
@@ -1212,9 +1163,7 @@ bool Tracking::ParseORBParamFile(cv::FileStorage &fSettings) {
   if (!node.empty() && node.isReal()) {
     fScaleFactor = node.real();
   } else {
-    std::cerr << "*ORBextractor.scaleFactor parameter doesn't exist or is not "
-                 "a real number*"
-              << std::endl;
+    VerboseStream(Verbose::VERBOSITY_QUIET) << "*ORBextractor.scaleFactor parameter doesn't exist or is not a real number*" << std::endl;
     b_miss_params = true;
   }
 
@@ -1222,9 +1171,7 @@ bool Tracking::ParseORBParamFile(cv::FileStorage &fSettings) {
   if (!node.empty() && node.isInt()) {
     nLevels = node.operator int();
   } else {
-    std::cerr
-        << "*ORBextractor.nLevels parameter doesn't exist or is not an integer*"
-        << std::endl;
+    VerboseStream(Verbose::VERBOSITY_QUIET) << "*ORBextractor.nLevels parameter doesn't exist or is not an integer*" << std::endl;
     b_miss_params = true;
   }
 
@@ -1232,9 +1179,7 @@ bool Tracking::ParseORBParamFile(cv::FileStorage &fSettings) {
   if (!node.empty() && node.isInt()) {
     fIniThFAST = node.operator int();
   } else {
-    std::cerr << "*ORBextractor.iniThFAST parameter doesn't exist or is not an "
-                 "integer*"
-              << std::endl;
+    VerboseStream(Verbose::VERBOSITY_QUIET) << "*ORBextractor.iniThFAST parameter doesn't exist or is not an integer*" << std::endl;
     b_miss_params = true;
   }
 
@@ -1242,9 +1187,7 @@ bool Tracking::ParseORBParamFile(cv::FileStorage &fSettings) {
   if (!node.empty() && node.isInt()) {
     fMinThFAST = node.operator int();
   } else {
-    std::cerr << "*ORBextractor.minThFAST parameter doesn't exist or is not an "
-                 "integer*"
-              << std::endl;
+    VerboseStream(Verbose::VERBOSITY_QUIET) << "*ORBextractor.minThFAST parameter doesn't exist or is not an integer*" << std::endl;
     b_miss_params = true;
   }
 
@@ -1263,12 +1206,12 @@ bool Tracking::ParseORBParamFile(cv::FileStorage &fSettings) {
     mpIniORBextractor = new ORBextractor(5 * nFeatures, fScaleFactor, nLevels,
                                          fIniThFAST, fMinThFAST);
 
-  cout << endl << "ORB Extractor Parameters: " << endl;
-  cout << "- Number of Features: " << nFeatures << endl;
-  cout << "- Scale Levels: " << nLevels << endl;
-  cout << "- Scale Factor: " << fScaleFactor << endl;
-  cout << "- Initial Fast Threshold: " << fIniThFAST << endl;
-  cout << "- Minimum Fast Threshold: " << fMinThFAST << endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << std::endl << "ORB Extractor Parameters: " << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "- Number of Features: " << nFeatures << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "- Scale Levels: " << nLevels << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "- Scale Factor: " << fScaleFactor << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "- Initial Fast Threshold: " << fIniThFAST << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "- Minimum Fast Threshold: " << fMinThFAST << std::endl;
 
   return true;
 }
@@ -1281,16 +1224,15 @@ bool Tracking::ParseIMUParamFile(cv::FileStorage &fSettings) {
   if (!node.empty()) {
     cvTbc = node.mat();
     if (cvTbc.rows != 4 || cvTbc.cols != 4) {
-      std::cerr << "*Tbc matrix have to be a 4x4 transformation matrix*"
-                << std::endl;
+      VerboseStream(Verbose::VERBOSITY_QUIET) << "*Tbc matrix have to be a 4x4 transformation matrix*" << std::endl;
       b_miss_params = true;
     }
   } else {
-    std::cerr << "*Tbc matrix doesn't exist*" << std::endl;
+    VerboseStream(Verbose::VERBOSITY_QUIET) << "*Tbc matrix doesn't exist*" << std::endl;
     b_miss_params = true;
   }
-  cout << endl;
-  cout << "Left camera to Imu Transform (Tbc): " << endl << cvTbc << endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "Left camera to Imu Transform (Tbc): " << std::endl << cvTbc << std::endl;
   Eigen::Matrix<float, 4, 4, Eigen::RowMajor> eigTbc(cvTbc.ptr<float>(0));
   Sophus::SE3f Tbc(eigTbc);
 
@@ -1301,7 +1243,7 @@ bool Tracking::ParseIMUParamFile(cv::FileStorage &fSettings) {
   }
 
   if (!mInsertKFsLost)
-    cout << "Do not insert keyframes when lost visual tracking " << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "Do not insert keyframes when lost visual tracking " << std::endl;
 
   float Ng, Na, Ngw, Naw;
 
@@ -1310,8 +1252,7 @@ bool Tracking::ParseIMUParamFile(cv::FileStorage &fSettings) {
     mImuFreq = node.operator int();
     mImuPer = 0.001; // 1.0 / (double) mImuFreq;
   } else {
-    std::cerr << "*IMU.Frequency parameter doesn't exist or is not an integer*"
-              << std::endl;
+    VerboseStream(Verbose::VERBOSITY_QUIET) << "*IMU.Frequency parameter doesn't exist or is not an integer*" << std::endl;
     b_miss_params = true;
   }
 
@@ -1319,9 +1260,7 @@ bool Tracking::ParseIMUParamFile(cv::FileStorage &fSettings) {
   if (!node.empty() && node.isReal()) {
     Ng = node.real();
   } else {
-    std::cerr
-        << "*IMU.NoiseGyro parameter doesn't exist or is not a real number*"
-        << std::endl;
+    VerboseStream(Verbose::VERBOSITY_QUIET) << "*IMU.NoiseGyro parameter doesn't exist or is not a real number*" << std::endl;
     b_miss_params = true;
   }
 
@@ -1329,9 +1268,7 @@ bool Tracking::ParseIMUParamFile(cv::FileStorage &fSettings) {
   if (!node.empty() && node.isReal()) {
     Na = node.real();
   } else {
-    std::cerr
-        << "*IMU.NoiseAcc parameter doesn't exist or is not a real number*"
-        << std::endl;
+    VerboseStream(Verbose::VERBOSITY_QUIET) << "*IMU.NoiseAcc parameter doesn't exist or is not a real number*" << std::endl;
     b_miss_params = true;
   }
 
@@ -1339,9 +1276,7 @@ bool Tracking::ParseIMUParamFile(cv::FileStorage &fSettings) {
   if (!node.empty() && node.isReal()) {
     Ngw = node.real();
   } else {
-    std::cerr
-        << "*IMU.GyroWalk parameter doesn't exist or is not a real number*"
-        << std::endl;
+    VerboseStream(Verbose::VERBOSITY_QUIET) << "*IMU.GyroWalk parameter doesn't exist or is not a real number*" << std::endl;
     b_miss_params = true;
   }
 
@@ -1349,8 +1284,7 @@ bool Tracking::ParseIMUParamFile(cv::FileStorage &fSettings) {
   if (!node.empty() && node.isReal()) {
     Naw = node.real();
   } else {
-    std::cerr << "*IMU.AccWalk parameter doesn't exist or is not a real number*"
-              << std::endl;
+    VerboseStream(Verbose::VERBOSITY_QUIET) << "*IMU.AccWalk parameter doesn't exist or is not a real number*" << std::endl;
     b_miss_params = true;
   }
 
@@ -1361,7 +1295,7 @@ bool Tracking::ParseIMUParamFile(cv::FileStorage &fSettings) {
   }
 
   if (mFastInit)
-    cout << "Fast IMU initialization. Acceleration is not checked \n";
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "Fast IMU initialization. Acceleration is not checked \n";
 
   // Read optional flag to use IMU pose (from settings) and optionally use IMU
   // trajectory
@@ -1388,15 +1322,14 @@ bool Tracking::ParseIMUParamFile(cv::FileStorage &fSettings) {
   }
 
   const float sf = sqrt(mImuFreq);
-  cout << endl;
-  cout << "IMU frequency: " << mImuFreq << " Hz" << endl;
-  cout << "IMU gyro noise: " << Ng << " rad/s/sqrt(Hz)" << endl;
-  cout << "IMU gyro walk: " << Ngw << " rad/s^2/sqrt(Hz)" << endl;
-  cout << "IMU accelerometer noise: " << Na << " m/s^2/sqrt(Hz)" << endl;
-  cout << "IMU accelerometer walk: " << Naw << " m/s^3/sqrt(Hz)" << endl;
-  cout << "IMU.UseImuPose: " << (mUseImuPose ? "true" : "false") << std::endl;
-  cout << "IMU.UseImuTrajectory: " << (mUseImuTrajectory ? "true" : "false")
-    << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "IMU frequency: " << mImuFreq << " Hz" << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "IMU gyro noise: " << Ng << " rad/s/sqrt(Hz)" << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "IMU gyro walk: " << Ngw << " rad/s^2/sqrt(Hz)" << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "IMU accelerometer noise: " << Na << " m/s^2/sqrt(Hz)" << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "IMU accelerometer walk: " << Naw << " m/s^3/sqrt(Hz)" << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "IMU.UseImuPose: " << (mUseImuPose ? "true" : "false") << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "IMU.UseImuTrajectory: " << (mUseImuTrajectory ? "true" : "false") << std::endl;
 
   mpImuCalib = new IMU::Calib(Tbc, Ng * sf, Na * sf, Ngw / sf, Naw / sf);
 
@@ -1604,10 +1537,9 @@ void Tracking::PreintegrateIMU() {
   while (true) {
     bool bSleep = false;
     {
-      unique_lock<mutex> lock(mMutexImuQueue);
-      if (!mlQueueImuData.empty()) {
-        IMU::Point *m = &mlQueueImuData.front();
-        cout.precision(17);
+        unique_lock<mutex> lock(mMutexImuQueue);
+        if (!mlQueueImuData.empty()) {
+          IMU::Point *m = &mlQueueImuData.front();
         if (m->t < mCurrentFrame.mpPrevFrame->mTimeStamp - mImuPer) {
           mlQueueImuData.pop_front();
         } else if (m->t < mCurrentFrame.mTimeStamp - mImuPer) {
@@ -1628,7 +1560,7 @@ void Tracking::PreintegrateIMU() {
 
   const int n = mvImuFromLastFrame.size() - 1;
   if (n == 0) {
-    cout << "Empty IMU measurements vector!!!\n";
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "Empty IMU measurements vector!!!\n";
     return;
   }
 
@@ -1675,7 +1607,7 @@ void Tracking::PreintegrateIMU() {
     }
 
     if (!mpImuPreintegratedFromLastKF)
-      cout << "mpImuPreintegratedFromLastKF does not exist" << endl;
+      VerboseStream(Verbose::VERBOSITY_NORMAL) << "mpImuPreintegratedFromLastKF does not exist" << std::endl;
     mpImuPreintegratedFromLastKF->IntegrateNewMeasurement(acc, angVel, tstep);
     pImuPreintegratedFromLastFrame->IntegrateNewMeasurement(acc, angVel, tstep);
   }
@@ -1745,7 +1677,7 @@ bool Tracking::PredictStateIMU() {
     mCurrentFrame.mPredBias = mCurrentFrame.mImuBias;
     return true;
   } else
-    cout << "not IMU prediction!!" << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "not IMU prediction!!" << std::endl;
 
   return false;
 }
@@ -1861,30 +1793,27 @@ void Tracking::ResetFrameIMU() {
  */
 void Tracking::Track() {
   mbLastFrameIsKF = false;
-  if (bStepByStep) {
-    std::cout << "Tracking: Waiting to the next step" << std::endl;
+    if (bStepByStep) {
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "Tracking: Waiting to the next step" << std::endl;
     while (!mbStep && bStepByStep)
       usleep(500);
     mbStep = false;
   }
 
-  if (mpLocalMapper->mbBadImu) {
-    cout << "TRACK: Reset map because local mapper set the bad imu flag "
-         << endl;
+    if (mpLocalMapper->mbBadImu) {
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "TRACK: Reset map because local mapper set the bad imu flag " << std::endl;
     mpSystem->ResetActiveMap();
     return;
   }
 
   Map *pCurrentMap = mpAtlas->GetCurrentMap();
   if (!pCurrentMap) {
-    cout << "ERROR: There is not an active map in the atlas" << endl;
+    VerboseStream(Verbose::VERBOSITY_QUIET) << "ERROR: There is not an active map in the atlas" << std::endl;
   }
 
   if (mState != NO_IMAGES_YET) {
     if (mLastFrame.mTimeStamp > mCurrentFrame.mTimeStamp) {
-      cerr
-          << "ERROR: Frame with a timestamp older than previous frame detected!"
-          << endl;
+      VerboseStream(Verbose::VERBOSITY_QUIET) << "ERROR: Frame with a timestamp older than previous frame detected!" << std::endl;
       unique_lock<mutex> lock(mMutexImuQueue);
       mlQueueImuData.clear();
       CreateMapInAtlas();
@@ -1896,18 +1825,14 @@ void Tracking::Track() {
       if (mpAtlas->isInertial()) {
 
         if (mpAtlas->isImuInitialized()) {
-          cout << "Timestamp jump detected. State set to LOST. Reseting IMU "
-                  "integration..."
-               << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "Timestamp jump detected. State set to LOST. Reseting IMU integration..." << std::endl;
           if (!pCurrentMap->GetIniertialBA2()) {
             mpSystem->ResetActiveMap();
           } else {
             CreateMapInAtlas();
           }
         } else {
-          cout << "Timestamp jump detected, before IMU initialization. "
-                  "Reseting..."
-               << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "Timestamp jump detected, before IMU initialization. Reseting..." << std::endl;
           mpSystem->ResetActiveMap();
         }
         return;
@@ -2193,8 +2118,7 @@ void Tracking::Track() {
                            Verbose::VERBOSITY_NORMAL);
         if (!pCurrentMap->isImuInitialized() ||
             !pCurrentMap->GetIniertialBA2()) {
-          cout << "IMU is not or recently initialized. Reseting active map..."
-               << endl;
+          VerboseStream(Verbose::VERBOSITY_QUIET) << "IMU is not or recently initialized. Reseting active map..." << std::endl;
           mpSystem->ResetActiveMap();
         }
 
@@ -2230,7 +2154,7 @@ void Tracking::Track() {
     if (pCurrentMap->isImuInitialized()) {
       if (bOK) {
         if (mCurrentFrame.mnId == (mnLastRelocFrameId + mnFramesToResetIMU)) {
-          cout << "RESETING FRAME!!!" << endl;
+          VerboseStream(Verbose::VERBOSITY_NORMAL) << "RESETING FRAME!!!" << std::endl;
           ResetFrameIMU();
         } else if (mCurrentFrame.mnId > (mnLastRelocFrameId + 30))
           mLastBias = mCurrentFrame.mImuBias;
@@ -2379,14 +2303,14 @@ void Tracking::StereoInitialization() {
   if (mCurrentFrame.N > 500) {
     if (mSensor == System::IMU_STEREO || mSensor == System::IMU_RGBD) {
       if (!mCurrentFrame.mpImuPreintegrated || !mLastFrame.mpImuPreintegrated) {
-        cout << "not IMU meas" << endl;
+        VerboseStream(Verbose::VERBOSITY_NORMAL) << "not IMU meas" << std::endl;
         return;
       }
 
       if (!mFastInit && (mCurrentFrame.mpImuPreintegratedFrame->avgA -
                          mLastFrame.mpImuPreintegratedFrame->avgA)
                                 .norm() < 0.5) {
-        cout << "not enough acceleration" << endl;
+        VerboseStream(Verbose::VERBOSITY_NORMAL) << "not enough acceleration" << std::endl;
         return;
       }
 
@@ -2692,7 +2616,7 @@ void Tracking::CreateInitialMapMonocular() {
 void Tracking::CreateMapInAtlas() {
   mnLastInitFrameId = mCurrentFrame.mnId;
   mpAtlas->CreateNewMap();
-  cout << "Creating Map" << endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "Creating Map" << std::endl;
   if (mSensor == System::IMU_STEREO || mSensor == System::IMU_MONOCULAR ||
       mSensor == System::IMU_RGBD)
     mpAtlas->SetInertialSensor();
@@ -2760,8 +2684,8 @@ bool Tracking::TrackReferenceKeyFrame() {
   int nmatches =
       matcher.SearchByBoW(mpReferenceKF, mCurrentFrame, vpMapPointMatches);
 
-  if (nmatches < 15) {
-    cout << "TRACK_REF_KF: Less than 15 matches!!\n";
+    if (nmatches < 15) {
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "TRACK_REF_KF: Less than 15 matches!!\n";
     return false;
   }
 
@@ -3113,7 +3037,7 @@ bool Tracking::NeedNewKeyFrame() {
   if (mpLocalMapper->isStopped() || mpLocalMapper->stopRequested()) {
     /*if(mSensor == System::MONOCULAR)
     {
-        std::cout << "NeedNewKeyFrame: localmap stopped" << std::endl;
+        VerboseStream(Verbose::VERBOSITY_NORMAL) << "NeedNewKeyFrame: localmap stopped" << std::endl;
     }*/
     return false;
   }
@@ -3820,7 +3744,7 @@ bool Tracking::Relocalization() {
     return false;
   } else {
     mnLastRelocFrameId = mCurrentFrame.mnId;
-    cout << "Relocalized!!" << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "Relocalized!!" << std::endl;
     return true;
   }
 }
@@ -3910,7 +3834,7 @@ void Tracking::ResetActiveMap(bool bLocMap) {
   list<bool> lbLost;
   // lbLost.reserve(mlbLost.size());
   unsigned int index = mnFirstFrameId;
-  cout << "mnFirstFrameId = " << mnFirstFrameId << endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "mnFirstFrameId = " << mnFirstFrameId << std::endl;
   for (Map *pMap : mpAtlas->GetAllMaps()) {
     if (pMap->GetAllKeyFrames().size() > 0) {
       if (index > pMap->GetLowerKFID())
@@ -3920,7 +3844,7 @@ void Tracking::ResetActiveMap(bool bLocMap) {
 
   // cout << "First Frame id: " << index << endl;
   int num_lost = 0;
-  cout << "mnInitialFrameId = " << mnInitialFrameId << endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "mnInitialFrameId = " << mnInitialFrameId << std::endl;
 
   for (list<bool>::iterator ilbL = mlbLost.begin(); ilbL != mlbLost.end();
        ilbL++) {
@@ -3933,7 +3857,7 @@ void Tracking::ResetActiveMap(bool bLocMap) {
 
     index++;
   }
-  cout << num_lost << " Frames set to lost" << endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << num_lost << " Frames set to lost" << std::endl;
 
   mlbLost = lbLost;
 
@@ -4107,7 +4031,7 @@ bool Tracking::Stop() {
   unique_lock<mutex> lock(mMutexStop);
   if (mbStopRequested && !mbNotStop) {
     mbStopped = true;
-    cout << "Tracking STOP" << endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "Tracking STOP" << std::endl;
     return true;
   }
 

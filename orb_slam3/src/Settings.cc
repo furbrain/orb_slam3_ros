@@ -42,17 +42,15 @@ float Settings::readParameter<float>(cv::FileStorage &fSettings,
   cv::FileNode node = fSettings[name];
   if (node.empty()) {
     if (required) {
-      std::cerr << name << " required parameter does not exist, aborting..."
-                << std::endl;
+      VerboseStream(Verbose::VERBOSITY_QUIET) << name << " required parameter does not exist, aborting..." << std::endl;
       exit(-1);
     } else {
-      std::cerr << name << " optional parameter does not exist..." << std::endl;
+      VerboseStream(Verbose::VERBOSITY_QUIET) << name << " optional parameter does not exist..." << std::endl;
       found = false;
       return 0.0f;
     }
   } else if (!node.isReal()) {
-    std::cerr << name << " parameter must be a real number, aborting..."
-              << std::endl;
+  VerboseStream(Verbose::VERBOSITY_QUIET) << name << " parameter must be a real number, aborting..." << std::endl;
     exit(-1);
   } else {
     found = true;
@@ -67,17 +65,15 @@ int Settings::readParameter<int>(cv::FileStorage &fSettings,
   cv::FileNode node = fSettings[name];
   if (node.empty()) {
     if (required) {
-      std::cerr << name << " required parameter does not exist, aborting..."
-                << std::endl;
+      VerboseStream(Verbose::VERBOSITY_QUIET) << name << " required parameter does not exist, aborting..." << std::endl;
       exit(-1);
     } else {
-      std::cerr << name << " optional parameter does not exist..." << std::endl;
+      VerboseStream(Verbose::VERBOSITY_QUIET) << name << " optional parameter does not exist..." << std::endl;
       found = false;
       return 0;
     }
   } else if (!node.isInt()) {
-    std::cerr << name << " parameter must be an integer number, aborting..."
-              << std::endl;
+  VerboseStream(Verbose::VERBOSITY_QUIET) << name << " parameter must be an integer number, aborting..." << std::endl;
     exit(-1);
   } else {
     found = true;
@@ -92,17 +88,15 @@ string Settings::readParameter<string>(cv::FileStorage &fSettings,
   cv::FileNode node = fSettings[name];
   if (node.empty()) {
     if (required) {
-      std::cerr << name << " required parameter does not exist, aborting..."
-                << std::endl;
+      VerboseStream(Verbose::VERBOSITY_QUIET) << name << " required parameter does not exist, aborting..." << std::endl;
       exit(-1);
     } else {
-      std::cerr << name << " optional parameter does not exist..." << std::endl;
+      VerboseStream(Verbose::VERBOSITY_QUIET) << name << " optional parameter does not exist..." << std::endl;
       found = false;
       return string();
     }
   } else if (!node.isString()) {
-    std::cerr << name << " parameter must be a string, aborting..."
-              << std::endl;
+  VerboseStream(Verbose::VERBOSITY_QUIET) << name << " parameter must be a string, aborting..." << std::endl;
     exit(-1);
   } else {
     found = true;
@@ -115,13 +109,12 @@ cv::Mat Settings::readParameter<cv::Mat>(cv::FileStorage &fSettings,
                                          const std::string &name, bool &found,
                                          const bool required) {
   cv::FileNode node = fSettings[name];
-  if (node.empty()) {
+    if (node.empty()) {
     if (required) {
-      std::cerr << name << " required parameter does not exist, aborting..."
-                << std::endl;
+      VerboseStream(Verbose::VERBOSITY_QUIET) << name << " required parameter does not exist, aborting..." << std::endl;
       exit(-1);
     } else {
-      std::cerr << name << " optional parameter does not exist..." << std::endl;
+      VerboseStream(Verbose::VERBOSITY_QUIET) << name << " optional parameter does not exist..." << std::endl;
       found = false;
       return cv::Mat();
     }
@@ -139,55 +132,54 @@ Settings::Settings(const std::string &configFile, const int &sensor)
   // Open settings file
   cv::FileStorage fSettings(configFile, cv::FileStorage::READ);
   if (!fSettings.isOpened()) {
-    cerr << "[ERROR]: could not open configuration file at: " << configFile
-         << endl;
-    cerr << "Aborting..." << endl;
+    VerboseStream(Verbose::VERBOSITY_QUIET) << "[ERROR]: could not open configuration file at: " << configFile;
+    VerboseStream(Verbose::VERBOSITY_QUIET) << "Aborting...";
 
     exit(-1);
   } else {
-    cout << "Loading settings from " << configFile << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "Loading settings from " << configFile;
   }
 
   // Read first camera
   readCamera1(fSettings);
-  cout << "\t-Loaded camera 1" << endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "\t-Loaded camera 1";
 
   // Read second camera if stereo (not rectified)
   if (sensor_ == System::STEREO || sensor_ == System::IMU_STEREO) {
     readCamera2(fSettings);
-    cout << "\t-Loaded camera 2" << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "\t-Loaded camera 2";
   }
 
   // Read image info
   readImageInfo(fSettings);
-  cout << "\t-Loaded image info" << endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "\t-Loaded image info";
 
   if (sensor_ == System::IMU_MONOCULAR || sensor_ == System::IMU_STEREO ||
       sensor_ == System::IMU_RGBD) {
     readIMU(fSettings);
-    cout << "\t-Loaded IMU calibration" << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "\t-Loaded IMU calibration";
   }
 
   if (sensor_ == System::RGBD || sensor_ == System::IMU_RGBD) {
     readRGBD(fSettings);
-    cout << "\t-Loaded RGB-D calibration" << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "\t-Loaded RGB-D calibration";
   }
 
   readORB(fSettings);
-  cout << "\t-Loaded ORB settings" << endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "\t-Loaded ORB settings";
   // readViewer(fSettings);
   // cout << "\t-Loaded viewer settings" << endl;
   readLoadAndSave(fSettings);
-  cout << "\t-Loaded Atlas settings" << endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "\t-Loaded Atlas settings";
   readOtherParameters(fSettings);
-  cout << "\t-Loaded misc parameters" << endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "\t-Loaded misc parameters";
 
   if (bNeedToRectify_) {
     precomputeRectificationMaps();
-    cout << "\t-Computed rectification maps" << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "\t-Computed rectification maps";
   }
 
-  cout << "----------------------------------" << endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "----------------------------------";
 }
 
 void Settings::readCamera1(cv::FileStorage &fSettings) {
@@ -282,7 +274,7 @@ void Settings::readCamera1(cv::FileStorage &fSettings) {
           vOverlapping;
     }
   } else {
-    cerr << "Error: " << cameraModel << " not known" << endl;
+    VerboseStream(Verbose::VERBOSITY_QUIET) << "Error: " << cameraModel << " not known";
     exit(-1);
   }
 }

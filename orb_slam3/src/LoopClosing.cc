@@ -24,6 +24,7 @@
 #include "Optimizer.h"
 #include "ORBmatcher.h"
 #include "G2oTypes.h"
+#include "System.h"
 
 #include<mutex>
 #include<thread>
@@ -124,7 +125,7 @@ void LoopClosing::Run()
                     if ((mpTracker->mSensor==System::IMU_MONOCULAR || mpTracker->mSensor==System::IMU_STEREO || mpTracker->mSensor==System::IMU_RGBD) &&
                         (!mpCurrentKF->GetMap()->isImuInitialized()))
                     {
-                        cout << "IMU is not initilized, merge is aborted" << endl;
+                        VerboseStream(Verbose::VERBOSITY_QUIET) << "IMU is not initilized, merge is aborted";
                     }
                     else
                     {
@@ -140,7 +141,7 @@ void LoopClosing::Run()
 
                         if(mpCurrentKF->GetMap()->IsInertial() && mpMergeMatchedKF->GetMap()->IsInertial())
                         {
-                            cout << "Merge check transformation with IMU" << endl;
+                            VerboseStream(Verbose::VERBOSITY_DEBUG) << "Merge check transformation with IMU";
                             if(mSold_new.scale()<0.90||mSold_new.scale()>1.1){
                                 mpMergeLastCurrentKF->SetErase();
                                 mpMergeMatchedKF->SetErase();
@@ -236,7 +237,7 @@ void LoopClosing::Run()
                         g2o::Sim3 g2oSww_new = g2oTwc*mg2oLoopScw;
 
                         Eigen::Vector3d phi = LogSO3(g2oSww_new.rotation().toRotationMatrix());
-                        cout << "phi = " << phi.transpose() << endl; 
+                        VerboseStream(Verbose::VERBOSITY_DEBUG) << "phi = " << phi.transpose(); 
                         if (fabs(phi(0))<0.008f && fabs(phi(1))<0.008f && fabs(phi(2))<0.349f)
                         {
                             if(mpCurrentKF->GetMap()->IsInertial())
@@ -255,7 +256,7 @@ void LoopClosing::Run()
                         }
                         else
                         {
-                            cout << "BAD LOOP!!!" << endl;
+                            VerboseStream(Verbose::VERBOSITY_QUIET) << "BAD LOOP!!!";
                             bGoodLoop = false;
                         }
 
@@ -398,7 +399,7 @@ bool LoopClosing::NewDetectCommonRegions()
 
             if(!mbLoopDetected)
             {
-                cout << "PR: Loop detected with Reffine Sim3" << endl;
+                VerboseStream(Verbose::VERBOSITY_NORMAL) << "PR: Loop detected with Reffine Sim3";
             }
         }
         else
@@ -978,7 +979,7 @@ void LoopClosing::CorrectLoop()
     // If a Global Bundle Adjustment is running, abort it
     if(isRunningGBA())
     {
-        cout << "Stoping Global Bundle Adjustment...";
+        VerboseStream(Verbose::VERBOSITY_NORMAL) << "Stoping Global Bundle Adjustment...";
         unique_lock<mutex> lock(mMutexGBA);
         mbStopGBA = true;
 
@@ -989,7 +990,7 @@ void LoopClosing::CorrectLoop()
             mpThreadGBA->detach();
             delete mpThreadGBA;
         }
-        cout << "  Done!!" << endl;
+        VerboseStream(Verbose::VERBOSITY_NORMAL) << "  Done!!";
     }
 
     // Wait until Local Mapping has effectively stopped

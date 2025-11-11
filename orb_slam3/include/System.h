@@ -27,6 +27,7 @@
 #include<string>
 #include<thread>
 #include<opencv2/core/core.hpp>
+#include <sstream>
 
 #include "Tracking.h"
 #include "FrameDrawer.h"
@@ -74,6 +75,37 @@ public:
     {
         th = _th;
     }
+};
+
+// Small helper to build a verbose message using stream syntax and send it
+// to Verbose::PrintMess on destruction. Implemented inline so it can be used
+// across the codebase without extra link steps.
+class VerboseStream {
+public:
+    explicit VerboseStream(Verbose::eLevel lev) : lev_(lev) {}
+    ~VerboseStream() { Verbose::PrintMess(oss_.str(), lev_); }
+
+    template <typename T>
+    VerboseStream &operator<<(const T &v) {
+        oss_ << v;
+        return *this;
+    }
+
+    // manipulators like std::endl
+    VerboseStream &operator<<(std::ostream &(*func)(std::ostream &)) {
+        func(oss_);
+        return *this;
+    }
+
+    // manipulators like std::setprecision
+    VerboseStream &operator<<(std::ios_base &(*func)(std::ios_base &)) {
+        func(oss_);
+        return *this;
+    }
+
+private:
+    std::ostringstream oss_;
+    Verbose::eLevel lev_;
 };
 
 class FrameDrawer;

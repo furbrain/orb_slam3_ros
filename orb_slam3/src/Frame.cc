@@ -23,6 +23,7 @@
 #include "KeyFrame.h"
 #include "ORBextractor.h"
 #include "Converter.h"
+#include "System.h"
 #include "ORBmatcher.h"
 #include "GeometricCamera.h"
 
@@ -600,7 +601,7 @@ bool Frame::ProjectPointDistort(MapPoint* pMP, cv::Point2f &kp, float &u, float 
     // Check positive depth
     if(PcZ<0.0f)
     {
-        cout << "Negative depth: " << PcZ << endl;
+        VerboseStream(Verbose::VERBOSITY_QUIET) << "Negative depth: " << PcZ;
         return false;
     }
 

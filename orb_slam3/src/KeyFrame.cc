@@ -19,6 +19,7 @@
 #include "KeyFrame.h"
 #include "Converter.h"
 #include "ImuTypes.h"
+#include "System.h"
 #include<mutex>
 
 namespace ORB_SLAM3
@@ -426,11 +427,11 @@ void KeyFrame::UpdateConnections(bool upParent)
     vector<pair<int,KeyFrame*> > vPairs;
     vPairs.reserve(KFcounter.size());
     if(!upParent)
-        cout << "UPDATE_CONN: current KF " << mnId << endl;
+        VerboseStream(Verbose::VERBOSITY_DEBUG) << "UPDATE_CONN: current KF " << mnId;
     for(map<KeyFrame*,int>::iterator mit=KFcounter.begin(), mend=KFcounter.end(); mit!=mend; mit++)
     {
         if(!upParent)
-            cout << "  UPDATE_CONN: KF " << mit->first->mnId << " ; num matches: " << mit->second << endl;
+            VerboseStream(Verbose::VERBOSITY_DEBUG) << "  UPDATE_CONN: KF " << mit->first->mnId << " ; num matches: " << mit->second;
         if(mit->second>nmax)
         {
             nmax=mit->second;
@@ -493,7 +494,7 @@ void KeyFrame::ChangeParent(KeyFrame *pKF)
     unique_lock<mutex> lockCon(mMutexConnections);
     if(pKF == this)
     {
-        cout << "ERROR: Change parent KF, the parent and child are the same KF" << endl;
+        VerboseStream(Verbose::VERBOSITY_QUIET) << "ERROR: Change parent KF, the parent and child are the same KF";
         throw std::invalid_argument("The parent and child can not be the same");
     }
 
@@ -983,7 +984,7 @@ void KeyFrame::PostLoad(map<long unsigned int, KeyFrame*>& mpKFid, map<long unsi
     }
     else
     {
-        cout << "ERROR: There is not a main camera in KF " << mnId << endl;
+        VerboseStream(Verbose::VERBOSITY_QUIET) << "ERROR: There is not a main camera in KF " << mnId;
     }
     if(mnBackupIdCamera2 >= 0)
     {
@@ -1026,7 +1027,7 @@ bool KeyFrame::ProjectPointDistort(MapPoint* pMP, cv::Point2f &kp, float &u, flo
     // Check positive depth
     if(PcZ<0.0f)
     {
-        cout << "Negative depth: " << PcZ << endl;
+        VerboseStream(Verbose::VERBOSITY_QUIET) << "Negative depth: " << PcZ;
         return false;
     }
 
@@ -1089,7 +1090,7 @@ bool KeyFrame::ProjectPointUnDistort(MapPoint* pMP, cv::Point2f &kp, float &u, f
     // Check positive depth
     if(PcZ<0.0f)
     {
-        cout << "Negative depth: " << PcZ << endl;
+        VerboseStream(Verbose::VERBOSITY_QUIET) << "Negative depth: " << PcZ;
         return false;
     }
 

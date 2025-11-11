@@ -46,33 +46,32 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     mbActivateLocalizationMode(false), mbDeactivateLocalizationMode(false), mbShutDown(false)
 {
     // Output welcome message
-    cout << endl <<
-    "ORB-SLAM3 Copyright (C) 2017-2020 Carlos Campos, Richard Elvira, Juan J. Gómez, José M.M. Montiel and Juan D. Tardós, University of Zaragoza." << endl <<
-    "ORB-SLAM2 Copyright (C) 2014-2016 Raúl Mur-Artal, José M.M. Montiel and Juan D. Tardós, University of Zaragoza." << endl <<
-    "This program comes with ABSOLUTELY NO WARRANTY;" << endl  <<
-    "This is free software, and you are welcome to redistribute it" << endl <<
-    "under certain conditions. See LICENSE.txt." << endl << endl;
+    {
+        std::string welcome =
+            "ORB-SLAM3 Copyright (C) 2017-2020 Carlos Campos, Richard Elvira, Juan J. Gómez, José M.M. Montiel and Juan D. Tardós, University of Zaragoza.\n"
+            "ORB-SLAM2 Copyright (C) 2014-2016 Raúl Mur-Artal, José M.M. Montiel and Juan D. Tardós, University of Zaragoza.\n"
+            "This program comes with ABSOLUTELY NO WARRANTY;\n"
+            "This is free software, and you are welcome to redistribute it\n"
+            "under certain conditions. See LICENSE.txt.";
+        VerboseStream(Verbose::VERBOSITY_NORMAL) << welcome;
+    }
 
-    cout << "Input sensor was set to: ";
-
-    if(mSensor==MONOCULAR)
-        cout << "Monocular" << endl;
-    else if(mSensor==STEREO)
-        cout << "Stereo" << endl;
-    else if(mSensor==RGBD)
-        cout << "RGB-D" << endl;
-    else if(mSensor==IMU_MONOCULAR)
-        cout << "Monocular-Inertial" << endl;
-    else if(mSensor==IMU_STEREO)
-        cout << "Stereo-Inertial" << endl;
-    else if(mSensor==IMU_RGBD)
-        cout << "RGB-D-Inertial" << endl;
+    {
+        std::string sensorStr = "Input sensor was set to: ";
+        if(mSensor==MONOCULAR) sensorStr += "Monocular";
+        else if(mSensor==STEREO) sensorStr += "Stereo";
+        else if(mSensor==RGBD) sensorStr += "RGB-D";
+        else if(mSensor==IMU_MONOCULAR) sensorStr += "Monocular-Inertial";
+        else if(mSensor==IMU_STEREO) sensorStr += "Stereo-Inertial";
+        else if(mSensor==IMU_RGBD) sensorStr += "RGB-D-Inertial";
+        VerboseStream(Verbose::VERBOSITY_NORMAL) << sensorStr;
+    }
 
     //Check settings file
     cv::FileStorage fsSettings(strSettingsFile.c_str(), cv::FileStorage::READ);
     if(!fsSettings.isOpened())
     {
-       cerr << "Failed to open settings file at: " << strSettingsFile << endl;
+       VerboseStream(Verbose::VERBOSITY_QUIET) << "Failed to open settings file at: " << strSettingsFile;
        exit(-1);
     }
 
@@ -83,7 +82,7 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
         mStrLoadAtlasFromFile = settings_->atlasLoadFile();
         mStrSaveAtlasToFile = settings_->atlasSaveFile();
 
-        cout << (*settings_) << endl;
+        VerboseStream(Verbose::VERBOSITY_NORMAL) << (*settings_);
     }
     else{
         settings_ = nullptr;
@@ -110,17 +109,17 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     mStrVocabularyFilePath = strVocFile;
     
     //Load ORB Vocabulary
-    cout << endl << "Loading ORB Vocabulary. This could take a while..." << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "Loading ORB Vocabulary. This could take a while...";
 
     mpVocabulary = new ORBVocabulary();
     bool bVocLoad = mpVocabulary->loadFromBinFile(strVocFile);
     if(!bVocLoad)
     {
-        cerr << "Wrong path to vocabulary. " << endl;
-        cerr << "Failed to open at: " << strVocFile << endl;
+        VerboseStream(Verbose::VERBOSITY_QUIET) << "Wrong path to vocabulary.";
+        VerboseStream(Verbose::VERBOSITY_QUIET) << "Failed to open at: " << strVocFile;
         exit(-1);
     }
-    cout << "Vocabulary loaded!" << endl << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "Vocabulary loaded!";
 
     //Create KeyFrame Database
     mpKeyFrameDatabase = new KeyFrameDatabase(*mpVocabulary);
@@ -129,19 +128,19 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     if(mStrLoadAtlasFromFile.empty())
     {
         //Create the Atlas
-        cout << "Initialization of Atlas from scratch " << endl;
+        VerboseStream(Verbose::VERBOSITY_NORMAL) << "Initialization of Atlas from scratch";
         mpAtlas = new Atlas(0);
     }
     else
     {
         // Load the file with an earlier session
         //clock_t start = clock();
-        cout << "Initialization of Atlas from file: " << mStrLoadAtlasFromFile << endl;
+        VerboseStream(Verbose::VERBOSITY_NORMAL) << "Initialization of Atlas from file: " << mStrLoadAtlasFromFile;
         bool isRead = LoadAtlas(FileType::BINARY_FILE);
 
         if(!isRead)
         {
-            cout << "Error to load the file, please try with other session file or vocabulary file" << endl;
+            VerboseStream(Verbose::VERBOSITY_QUIET) << "Error to load the file, please try with other session file or vocabulary file";
             exit(-1);
         }
         //mpKeyFrameDatabase = new KeyFrameDatabase(*mpVocabulary);
@@ -169,7 +168,7 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
 
     //Initialize the Tracking thread
     //(it will live in the main thread of execution, the one that called this constructor)
-    cout << "Seq. Name: " << strSequence << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "Seq. Name: " << strSequence;
     mpTracker = new Tracking(this, mpVocabulary, mpFrameDrawer,
                              mpAtlas, mpKeyFrameDatabase, strSettingsFile, mSensor, settings_, strSequence);
 
@@ -182,14 +181,13 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
         mpLocalMapper->mThFarPoints = settings_->thFarPoints();
     else
         mpLocalMapper->mThFarPoints = fsSettings["thFarPoints"];
-    if(mpLocalMapper->mThFarPoints!=0)
+        if(mpLocalMapper->mThFarPoints!=0)
     {
-        cout << "Discard points further than " << mpLocalMapper->mThFarPoints << " m from current camera" << endl;
+        VerboseStream(Verbose::VERBOSITY_NORMAL) << "Discard points further than " << mpLocalMapper->mThFarPoints << " m from current camera";
         mpLocalMapper->mbFarPoints = true;
     }
     else
         mpLocalMapper->mbFarPoints = false;
-
     //Initialize the Loop Closing thread and launch
     // mSensor!=MONOCULAR && mSensor!=IMU_MONOCULAR
     mpLoopCloser = new LoopClosing(mpAtlas, mpKeyFrameDatabase, mpVocabulary, mSensor!=MONOCULAR, activeLC); // mSensor!=MONOCULAR);
@@ -216,7 +214,7 @@ Sophus::SE3f System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, 
 {
     if(mSensor!=STEREO && mSensor!=IMU_STEREO)
     {
-        cerr << "ERROR: you called TrackStereo but input sensor was not set to Stereo nor Stereo-Inertial." << endl;
+        VerboseStream(Verbose::VERBOSITY_QUIET) << "ERROR: you called TrackStereo but input sensor was not set to Stereo nor Stereo-Inertial.";
         exit(-1);
     }
 
@@ -301,7 +299,7 @@ Sophus::SE3f System::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const
 {
     if(mSensor!=RGBD  && mSensor!=IMU_RGBD)
     {
-        cerr << "ERROR: you called TrackRGBD but input sensor was not set to RGBD." << endl;
+        VerboseStream(Verbose::VERBOSITY_QUIET) << "ERROR: you called TrackRGBD but input sensor was not set to RGBD.";
         exit(-1);
     }
 
@@ -381,7 +379,7 @@ Sophus::SE3f System::TrackMonocular(const cv::Mat &im, const double &timestamp, 
 
     if(mSensor!=MONOCULAR && mSensor!=IMU_MONOCULAR)
     {
-        cerr << "ERROR: you called TrackMonocular but input sensor was not set to Monocular nor Monocular-Inertial." << endl;
+        VerboseStream(Verbose::VERBOSITY_QUIET) << "ERROR: you called TrackMonocular but input sensor was not set to Monocular nor Monocular-Inertial.";
         exit(-1);
     }
 
@@ -427,7 +425,7 @@ Sophus::SE3f System::TrackMonocular(const cv::Mat &im, const double &timestamp, 
         }
         else if(mbResetActiveMap)
         {
-            cout << "SYSTEM-> Reseting active map in monocular case" << endl;
+              VerboseStream(Verbose::VERBOSITY_NORMAL) << "SYSTEM-> Reseting active map in monocular case";
             mpTracker->ResetActiveMap();
             mbResetActiveMap = false;
         }
@@ -494,7 +492,7 @@ void System::Shutdown()
         mbShutDown = true;
     }
 
-    cout << "Shutdown" << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "Shutdown";
 
     mpLocalMapper->RequestFinish();
     mpLoopCloser->RequestFinish();
@@ -535,10 +533,10 @@ bool System::isShutDown() {
 
 void System::SaveTrajectoryTUM(const string &filename)
 {
-    cout << endl << "Saving camera trajectory to " << filename << " ..." << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "Saving camera trajectory to " << filename << " ...";
     if(mSensor==MONOCULAR)
     {
-        cerr << "ERROR: SaveTrajectoryTUM cannot be used for monocular." << endl;
+        VerboseStream(Verbose::VERBOSITY_QUIET) << "ERROR: SaveTrajectoryTUM cannot be used for monocular.";
         return;
     }
 
@@ -595,7 +593,7 @@ void System::SaveTrajectoryTUM(const string &filename)
 
 void System::SaveKeyFrameTrajectoryTUM(const string &filename)
 {
-    cout << endl << "Saving keyframe trajectory to " << filename << " ..." << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "Saving keyframe trajectory to " << filename << " ...";
 
     vector<KeyFrame*> vpKFs = mpAtlas->GetAllKeyFrames();
     sort(vpKFs.begin(),vpKFs.end(),KeyFrame::lId);
@@ -629,20 +627,20 @@ void System::SaveKeyFrameTrajectoryTUM(const string &filename)
 void System::SaveTrajectoryEuRoC(const string &filename)
 {
 
-    cout << endl << "Saving trajectory to " << filename << " ..." << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "Saving trajectory to " << filename << " ...";
     /*if(mSensor==MONOCULAR)
     {
-        cerr << "ERROR: SaveTrajectoryEuRoC cannot be used for monocular." << endl;
+        VerboseStream(Verbose::VERBOSITY_QUIET) << "ERROR: SaveTrajectoryEuRoC cannot be used for monocular.";
         return;
     }*/
 
     vector<Map*> vpMaps = mpAtlas->GetAllMaps();
     int numMaxKFs = 0;
     Map* pBiggerMap;
-    std::cout << "There are " << std::to_string(vpMaps.size()) << " maps in the atlas" << std::endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "There are " << std::to_string(vpMaps.size()) << " maps in the atlas";
     for(Map* pMap :vpMaps)
     {
-        std::cout << "  Map " << std::to_string(pMap->GetId()) << " has " << std::to_string(pMap->GetAllKeyFrames().size()) << " KFs" << std::endl;
+        VerboseStream(Verbose::VERBOSITY_NORMAL) << "  Map " << std::to_string(pMap->GetId()) << " has " << std::to_string(pMap->GetAllKeyFrames().size()) << " KFs";
         if(pMap->GetAllKeyFrames().size() > numMaxKFs)
         {
             numMaxKFs = pMap->GetAllKeyFrames().size();
@@ -740,16 +738,16 @@ void System::SaveTrajectoryEuRoC(const string &filename)
     }
     //cout << "end saving trajectory" << endl;
     f.close();
-    cout << endl << "End of saving trajectory to " << filename << " ..." << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "End of saving trajectory to " << filename << " ...";
 }
 
 void System::SaveTrajectoryEuRoC(const string &filename, Map* pMap)
 {
 
-    cout << endl << "Saving trajectory of map " << pMap->GetId() << " to " << filename << " ..." << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "Saving trajectory of map " << pMap->GetId() << " to " << filename << " ...";
     /*if(mSensor==MONOCULAR)
     {
-        cerr << "ERROR: SaveTrajectoryEuRoC cannot be used for monocular." << endl;
+        VerboseStream(Verbose::VERBOSITY_QUIET) << "ERROR: SaveTrajectoryEuRoC cannot be used for monocular.";
         return;
     }*/
 
@@ -845,16 +843,16 @@ void System::SaveTrajectoryEuRoC(const string &filename, Map* pMap)
     }
     //cout << "end saving trajectory" << endl;
     f.close();
-    cout << endl << "End of saving trajectory to " << filename << " ..." << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "End of saving trajectory to " << filename << " ...";
 }
 
 /*void System::SaveTrajectoryEuRoC(const string &filename)
 {
 
-    cout << endl << "Saving trajectory to " << filename << " ..." << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "Saving trajectory to " << filename << " ...";
     if(mSensor==MONOCULAR)
     {
-        cerr << "ERROR: SaveTrajectoryEuRoC cannot be used for monocular." << endl;
+        VerboseStream(Verbose::VERBOSITY_QUIET) << "ERROR: SaveTrajectoryEuRoC cannot be used for monocular.";
         return;
     }
 
@@ -1023,7 +1021,7 @@ void System::SaveTrajectoryEuRoC(const string &filename, Map* pMap)
 
 void System::SaveKeyFrameTrajectoryEuRoC(const string &filename)
 {
-    cout << endl << "Saving keyframe trajectory to " << filename << " ..." << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "Saving keyframe trajectory to " << filename << " ...";
 
     vector<Map*> vpMaps = mpAtlas->GetAllMaps();
     Map* pBiggerMap;
@@ -1039,7 +1037,7 @@ void System::SaveKeyFrameTrajectoryEuRoC(const string &filename)
 
     if(!pBiggerMap)
     {
-        std::cout << "There is not a map!!" << std::endl;
+        VerboseStream(Verbose::VERBOSITY_QUIET) << "There is not a map!!";
         return;
     }
 
@@ -1081,7 +1079,7 @@ void System::SaveKeyFrameTrajectoryEuRoC(const string &filename)
 
 void System::SaveKeyFrameTrajectoryEuRoC(const string &filename, Map* pMap)
 {
-    cout << endl << "Saving keyframe trajectory of map " << pMap->GetId() << " to " << filename << " ..." << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "Saving keyframe trajectory of map " << pMap->GetId() << " to " << filename << " ...";
 
     vector<KeyFrame*> vpKFs = pMap->GetAllKeyFrames();
     sort(vpKFs.begin(),vpKFs.end(),KeyFrame::lId);
