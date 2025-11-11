@@ -1981,22 +1981,7 @@ void Tracking::Track() {
         } else {
           Verbose::PrintMess("TRACK: Track with motion model",
                              Verbose::VERBOSITY_DEBUG);
-          PredictStateIMU();
-          Sophus::SE3f T = mCurrentFrame.GetPose();
-          std::ostringstream oss;
-          oss << "TRACK: pose from IMU "
-              << "R=" << T.unit_quaternion()
-              << ", t=" << T.translation().transpose();
-          std::string s = oss.str();
-          Verbose::PrintMess(s, Verbose::VERBOSITY_DEBUG);
           bOK = TrackWithMotionModel();
-          T = mCurrentFrame.GetPose();
-          oss.str("");
-          oss << "TRACK: pose from model "
-              << "R=" << T.unit_quaternion()
-              << ", t=" << T.translation().transpose();
-          s = oss.str();
-          Verbose::PrintMess(s, Verbose::VERBOSITY_DEBUG);
           if (!bOK)
             bOK = TrackReferenceKeyFrame();
         }
@@ -2998,8 +2983,10 @@ bool Tracking::TrackLocalMap() {
       Verbose::PrintMess("TLM: PoseOptimization ", Verbose::VERBOSITY_DEBUG);
       Optimizer::PoseOptimization(&mCurrentFrame);
     } else {
+      bool bGotPreviousConstraint =
+          mCurrentFrame.mpPrevFrame && mCurrentFrame.mpPrevFrame->mpcpi;
       // if(!mbMapUpdated && mState == OK) //  && (mnMatchesInliers>30))
-      if (!mbMapUpdated) //  && (mnMatchesInliers>30))
+      if (!mbMapUpdated && bGotPreviousConstraint) //  && (mnMatchesInliers>30))
       {
         Verbose::PrintMess("TLM: PoseInertialOptimizationLastFrame ",
                            Verbose::VERBOSITY_DEBUG);
@@ -3043,9 +3030,9 @@ bool Tracking::TrackLocalMap() {
   // More restrictive if there was a relocalization recently
   mpLocalMapper->mnMatchesInliers = mnMatchesInliers;
   if (mCurrentFrame.mnId < mnLastRelocFrameId + mMaxFrames &&
-      mnMatchesInliers < 50) {
+      mnMatchesInliers < 20) {
     Verbose::PrintMess(
-        "TrackLocalMap: Too few inliers (<50), recent relocalization: " +
+        "TrackLocalMap: Too few inliers (<20), recent relocalization: " +
             to_string(mnMatchesInliers),
         Verbose::VERBOSITY_NORMAL);
     return false;
@@ -3070,7 +3057,7 @@ bool Tracking::TrackLocalMap() {
       return true;
   } else {
     if (mnMatchesInliers < 30) {
-      Verbose::PrintMess("TrackLocalMap: Too few inliers non-IMU(<15): " +
+      Verbose::PrintMess("TrackLocalMap: Too few inliers non-IMU(<30): " +
                              to_string(mnMatchesInliers),
                          Verbose::VERBOSITY_NORMAL);
       return false;
