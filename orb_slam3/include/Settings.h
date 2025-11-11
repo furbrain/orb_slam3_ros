@@ -96,6 +96,8 @@ public:
   float imuFrequency() { return imuFrequency_; }
   Sophus::SE3f Tbc() { return Tbc_; }
   bool insertKFsWhenLost() { return insertKFsWhenLost_; }
+  bool useImuTrajectory() { return useImuTrajectory_; }
+  bool useImuPose() { return useImuPose_; }
 
   float depthMapFactor() { return depthMapFactor_; }
 
@@ -199,6 +201,7 @@ private:
   Sophus::SE3f Tbc_;
   bool insertKFsWhenLost_;
   bool useImuPose_;
+  bool useImuTrajectory_;
   float noisePose_;
 
   /*

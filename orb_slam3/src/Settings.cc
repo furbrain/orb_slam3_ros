@@ -459,13 +459,23 @@ void Settings::readIMU(cv::FileStorage &fSettings) {
     insertKFsWhenLost_ = true;
   }
 
-  useImuPose_ =
+  bool temp =
       (bool)readParameter<int>(fSettings, "IMU.UseImuPose", found, false);
   if (found) {
+    useImuPose_ = temp;
     noisePose_ = readParameter<float>(fSettings, "IMU.NoisePose", found);
   } else {
     useImuPose_ = false;
     noisePose_ = 0.0f;
+  }
+
+  // Read optional flag to use IMU trajectory information (default: true)
+  readParameter<int>(fSettings, "IMU.UseImuTrajectory", found, false);
+  if (found) {
+    useImuTrajectory_ = (bool)readParameter<int>(
+        fSettings, "IMU.UseImuTrajectory", found, false);
+  } else {
+    useImuTrajectory_ = true;
   }
 }
 
