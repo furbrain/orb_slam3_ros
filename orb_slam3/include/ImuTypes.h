@@ -31,6 +31,8 @@
 
 #include "SerializationUtils.h"
 
+#include "Verbose.h"
+
 #include <boost/serialization/serialization.hpp>
 #include <boost/serialization/vector.hpp>
 
@@ -200,11 +202,11 @@ public:
     Bias GetUpdatedBias();
 
     void printMeasurements() const {
-        std::cout << "pint meas:\n";
+        VerboseStream(Verbose::VERBOSITY_DEBUG) << "pint meas:" << std::endl;
         for(int i=0; i<mvMeasurements.size(); i++){
-            std::cout << "meas " << mvMeasurements[i].t << std::endl;
+            VerboseStream(Verbose::VERBOSITY_DEBUG) << "meas " << mvMeasurements[i].t << std::endl;
         }
-        std::cout << "end pint meas:\n";
+        VerboseStream(Verbose::VERBOSITY_DEBUG) << "end pint meas:" << std::endl;
     }
 
 public:

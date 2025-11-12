@@ -24,6 +24,8 @@
 #include <sophus/se3.hpp>
 #include <Eigen/Core>
 
+#include "Verbose.h"
+
 namespace ORB_SLAM3
 {
 
@@ -43,16 +45,16 @@ public:
     static bool CheckMatrices(const cv::Mat &cvMat, const Eigen::Matrix<float,rows,cols> &eigMat) {
         const float epsilon = 1e-3;
         // std::cout << cvMat.cols - cols << cvMat.rows - rows << std::endl;
-        if(rows != cvMat.rows || cols != cvMat.cols) {
-            std::cout << "wrong cvmat size\n";
+            if(rows != cvMat.rows || cols != cvMat.cols) {
+            VerboseStream(Verbose::VERBOSITY_QUIET) << "wrong cvmat size" << std::endl;
             return false;
         }
         for(int i = 0; i < rows; i++)
             for(int j = 0; j < cols; j++)
                 if ((cvMat.at<float>(i,j) > (eigMat(i,j) + epsilon)) ||
                     (cvMat.at<float>(i,j) < (eigMat(i,j) - epsilon))){
-                    std::cout << "cv mat:\n" << cvMat << std::endl;
-                    std::cout << "eig mat:\n" << eigMat << std::endl;
+                    VerboseStream(Verbose::VERBOSITY_DEBUG) << "cv mat:\n" << cvMat << std::endl;
+                    VerboseStream(Verbose::VERBOSITY_DEBUG) << "eig mat:\n" << eigMat << std::endl;
                     return false;
                 }
         return true;
@@ -65,8 +67,8 @@ public:
             for(int j = 0; j < cols; j++)
                 if ((eigMat1(i,j) > (eigMat2(i,j) + epsilon)) ||
                     (eigMat1(i,j) < (eigMat2(i,j) - epsilon))){
-                    std::cout << "eig mat 1:\n" << eigMat1 << std::endl;
-                    std::cout << "eig mat 2:\n" << eigMat2 << std::endl;
+                    VerboseStream(Verbose::VERBOSITY_NORMAL) << "eig mat 1:\n" << eigMat1 << std::endl;
+                    VerboseStream(Verbose::VERBOSITY_NORMAL) << "eig mat 2:\n" << eigMat2 << std::endl;
                     return false;
                 }
         return true;

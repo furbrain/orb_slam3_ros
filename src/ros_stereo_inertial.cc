@@ -101,7 +101,7 @@ cv::Mat ImageGrabber::GetImage(const sensor_msgs::msg::Image::ConstSharedPtr img
     }
     else
     {
-        std::cout << "Error type" << std::endl;
+        ORB_SLAM3::VerboseStream(ORB_SLAM3::Verbose::VERBOSITY_NORMAL) << "Error type" << std::endl;
         return cv_ptr->image.clone();
     }
 }
@@ -136,7 +136,7 @@ void ImageGrabber::SyncWithImu()
 
             if((tImLeft-tImRight)>maxTimeDiff || (tImRight-tImLeft)>maxTimeDiff)
             {
-                // std::cout << "big time difference" << std::endl;
+                // VerboseStream(Verbose::VERBOSITY_NORMAL) << "big time difference" << std::endl;
                 continue;
             }
             if(tImLeft > mpImuGb->imuBuf.back()->header.stamp)

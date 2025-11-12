@@ -146,7 +146,7 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
         //mpKeyFrameDatabase = new KeyFrameDatabase(*mpVocabulary);
 
 
-        //cout << "KF in DB: " << mpKeyFrameDatabase->mnNumKFs << "; words: " << mpKeyFrameDatabase->mnNumWords << endl;
+        //VerboseStream(Verbose::VERBOSITY_NORMAL) << "KF in DB: " << mpKeyFrameDatabase->mnNumKFs << "; words: " << mpKeyFrameDatabase->mnNumWords << endl;
 
         loadedAtlas = true;
 
@@ -154,7 +154,7 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
 
         //clock_t timeElapsed = clock() - start;
         //unsigned msElapsed = timeElapsed / (CLOCKS_PER_SEC / 1000);
-        //cout << "Binary file read in " << msElapsed << " ms" << endl;
+        //VerboseStream(Verbose::VERBOSITY_NORMAL) << "Binary file read in " << msElapsed << " ms" << endl;
 
         //usleep(10*1000*1000);
     }
@@ -281,10 +281,10 @@ Sophus::SE3f System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, 
         for(size_t i_imu = 0; i_imu < vImuMeas.size(); i_imu++)
             mpTracker->GrabImuData(vImuMeas[i_imu]);
 
-    // std::cout << "start GrabImageStereo" << std::endl;
+    // VerboseStream(Verbose::VERBOSITY_NORMAL) << "start GrabImageStereo" << std::endl;
     Sophus::SE3f Tcw = mpTracker->GrabImageStereo(imLeftToFeed,imRightToFeed,timestamp,filename);
 
-    // std::cout << "out grabber" << std::endl;
+    // VerboseStream(Verbose::VERBOSITY_NORMAL) << "out grabber" << std::endl;
 
     unique_lock<mutex> lock2(mMutexState);
     mTrackingState = mpTracker->mState;
@@ -501,12 +501,12 @@ void System::Shutdown()
     /*while(!mpLocalMapper->isFinished() || !mpLoopCloser->isFinished() || mpLoopCloser->isRunningGBA())
     {
         if(!mpLocalMapper->isFinished())
-            cout << "mpLocalMapper is not finished" << endl;*/
+            VerboseStream(Verbose::VERBOSITY_NORMAL) << "mpLocalMapper is not finished" << endl;*/
         /*if(!mpLoopCloser->isFinished())
-            cout << "mpLoopCloser is not finished" << endl;
+            VerboseStream(Verbose::VERBOSITY_NORMAL) << "mpLoopCloser is not finished" << endl;
         if(mpLoopCloser->isRunningGBA()){
-            cout << "mpLoopCloser is running GBA" << endl;
-            cout << "break anyway..." << endl;
+            VerboseStream(Verbose::VERBOSITY_NORMAL) << "mpLoopCloser is running GBA" << endl;
+            VerboseStream(Verbose::VERBOSITY_NORMAL) << "break anyway..." << endl;
             break;
         }*/
         /*usleep(5000);
@@ -588,7 +588,7 @@ void System::SaveTrajectoryTUM(const string &filename)
         f << setprecision(6) << *lT << " " <<  setprecision(9) << twc(0) << " " << twc(1) << " " << twc(2) << " " << q.x() << " " << q.y() << " " << q.z() << " " << q.w() << endl;
     }
     f.close();
-    // cout << endl << "trajectory saved!" << endl;
+    // VerboseStream(Verbose::VERBOSITY_NORMAL) << endl << "trajectory saved!" << endl;
 }
 
 void System::SaveKeyFrameTrajectoryTUM(const string &filename)
@@ -661,7 +661,7 @@ void System::SaveTrajectoryEuRoC(const string &filename)
 
     ofstream f;
     f.open(filename.c_str());
-    // cout << "file open" << endl;
+    // VerboseStream(Verbose::VERBOSITY_NORMAL) << "file open" << endl;
     f << fixed;
 
     // Frame pose is stored relative to its reference keyframe (which is optimized by BA and pose graph).
@@ -674,22 +674,22 @@ void System::SaveTrajectoryEuRoC(const string &filename)
     list<double>::iterator lT = mpTracker->mlFrameTimes.begin();
     list<bool>::iterator lbL = mpTracker->mlbLost.begin();
 
-    //cout << "size mlpReferences: " << mpTracker->mlpReferences.size() << endl;
-    //cout << "size mlRelativeFramePoses: " << mpTracker->mlRelativeFramePoses.size() << endl;
-    //cout << "size mpTracker->mlFrameTimes: " << mpTracker->mlFrameTimes.size() << endl;
-    //cout << "size mpTracker->mlbLost: " << mpTracker->mlbLost.size() << endl;
+    //VerboseStream(Verbose::VERBOSITY_NORMAL) << "size mlpReferences: " << mpTracker->mlpReferences.size() << endl;
+    //VerboseStream(Verbose::VERBOSITY_NORMAL) << "size mlRelativeFramePoses: " << mpTracker->mlRelativeFramePoses.size() << endl;
+    //VerboseStream(Verbose::VERBOSITY_NORMAL) << "size mpTracker->mlFrameTimes: " << mpTracker->mlFrameTimes.size() << endl;
+    //VerboseStream(Verbose::VERBOSITY_NORMAL) << "size mpTracker->mlbLost: " << mpTracker->mlbLost.size() << endl;
 
 
     for(auto lit=mpTracker->mlRelativeFramePoses.begin(),
         lend=mpTracker->mlRelativeFramePoses.end();lit!=lend;lit++, lRit++, lT++, lbL++)
     {
-        //cout << "1" << endl;
+        //VerboseStream(Verbose::VERBOSITY_NORMAL) << "1" << endl;
         if(*lbL)
             continue;
 
 
         KeyFrame* pKF = *lRit;
-        //cout << "KF: " << pKF->mnId << endl;
+        //VerboseStream(Verbose::VERBOSITY_NORMAL) << "KF: " << pKF->mnId << endl;
 
         Sophus::SE3f Trw;
 
@@ -697,27 +697,27 @@ void System::SaveTrajectoryEuRoC(const string &filename)
         if (!pKF)
             continue;
 
-        //cout << "2.5" << endl;
+        //VerboseStream(Verbose::VERBOSITY_NORMAL) << "2.5" << endl;
 
         while(pKF->isBad())
         {
-            //cout << " 2.bad" << endl;
+            //VerboseStream(Verbose::VERBOSITY_NORMAL) << " 2.bad" << endl;
             Trw = Trw * pKF->mTcp;
             pKF = pKF->GetParent();
-            //cout << "--Parent KF: " << pKF->mnId << endl;
+            //VerboseStream(Verbose::VERBOSITY_NORMAL) << "--Parent KF: " << pKF->mnId << endl;
         }
 
         if(!pKF || pKF->GetMap() != pBiggerMap)
         {
-            //cout << "--Parent KF is from another map" << endl;
+            //VerboseStream(Verbose::VERBOSITY_NORMAL) << "--Parent KF is from another map" << endl;
             continue;
         }
 
-        //cout << "3" << endl;
+        //VerboseStream(Verbose::VERBOSITY_NORMAL) << "3" << endl;
 
         Trw = Trw * pKF->GetPose()*Twb; // Tcp*Tpw*Twb0=Tcb0 where b0 is the new world reference
 
-        // cout << "4" << endl;
+        // VerboseStream(Verbose::VERBOSITY_NORMAL) << "4" << endl;
 
         if (mSensor == IMU_MONOCULAR || mSensor == IMU_STEREO || mSensor==IMU_RGBD)
         {
@@ -734,9 +734,9 @@ void System::SaveTrajectoryEuRoC(const string &filename)
             f << setprecision(6) << 1e9*(*lT) << " " <<  setprecision(9) << twc(0) << " " << twc(1) << " " << twc(2) << " " << q.x() << " " << q.y() << " " << q.z() << " " << q.w() << endl;
         }
 
-        // cout << "5" << endl;
+        // VerboseStream(Verbose::VERBOSITY_NORMAL) << "5" << endl;
     }
-    //cout << "end saving trajectory" << endl;
+    //VerboseStream(Verbose::VERBOSITY_NORMAL) << "end saving trajectory" << endl;
     f.close();
     VerboseStream(Verbose::VERBOSITY_NORMAL) << "End of saving trajectory to " << filename << " ...";
 }
@@ -766,7 +766,7 @@ void System::SaveTrajectoryEuRoC(const string &filename, Map* pMap)
 
     ofstream f;
     f.open(filename.c_str());
-    // cout << "file open" << endl;
+    // VerboseStream(Verbose::VERBOSITY_NORMAL) << "file open" << endl;
     f << fixed;
 
     // Frame pose is stored relative to its reference keyframe (which is optimized by BA and pose graph).
@@ -779,22 +779,22 @@ void System::SaveTrajectoryEuRoC(const string &filename, Map* pMap)
     list<double>::iterator lT = mpTracker->mlFrameTimes.begin();
     list<bool>::iterator lbL = mpTracker->mlbLost.begin();
 
-    //cout << "size mlpReferences: " << mpTracker->mlpReferences.size() << endl;
-    //cout << "size mlRelativeFramePoses: " << mpTracker->mlRelativeFramePoses.size() << endl;
-    //cout << "size mpTracker->mlFrameTimes: " << mpTracker->mlFrameTimes.size() << endl;
-    //cout << "size mpTracker->mlbLost: " << mpTracker->mlbLost.size() << endl;
+    //VerboseStream(Verbose::VERBOSITY_NORMAL) << "size mlpReferences: " << mpTracker->mlpReferences.size() << endl;
+    //VerboseStream(Verbose::VERBOSITY_NORMAL) << "size mlRelativeFramePoses: " << mpTracker->mlRelativeFramePoses.size() << endl;
+    //VerboseStream(Verbose::VERBOSITY_NORMAL) << "size mpTracker->mlFrameTimes: " << mpTracker->mlFrameTimes.size() << endl;
+    //VerboseStream(Verbose::VERBOSITY_NORMAL) << "size mpTracker->mlbLost: " << mpTracker->mlbLost.size() << endl;
 
 
     for(auto lit=mpTracker->mlRelativeFramePoses.begin(),
         lend=mpTracker->mlRelativeFramePoses.end();lit!=lend;lit++, lRit++, lT++, lbL++)
     {
-        //cout << "1" << endl;
+        //VerboseStream(Verbose::VERBOSITY_NORMAL) << "1" << endl;
         if(*lbL)
             continue;
 
 
         KeyFrame* pKF = *lRit;
-        //cout << "KF: " << pKF->mnId << endl;
+        //VerboseStream(Verbose::VERBOSITY_NORMAL) << "KF: " << pKF->mnId << endl;
 
         Sophus::SE3f Trw;
 
@@ -802,27 +802,27 @@ void System::SaveTrajectoryEuRoC(const string &filename, Map* pMap)
         if (!pKF)
             continue;
 
-        //cout << "2.5" << endl;
+        //VerboseStream(Verbose::VERBOSITY_NORMAL) << "2.5" << endl;
 
         while(pKF->isBad())
         {
-            //cout << " 2.bad" << endl;
+            //VerboseStream(Verbose::VERBOSITY_NORMAL) << " 2.bad" << endl;
             Trw = Trw * pKF->mTcp;
             pKF = pKF->GetParent();
-            //cout << "--Parent KF: " << pKF->mnId << endl;
+            //VerboseStream(Verbose::VERBOSITY_NORMAL) << "--Parent KF: " << pKF->mnId << endl;
         }
 
         if(!pKF || pKF->GetMap() != pMap)
         {
-            //cout << "--Parent KF is from another map" << endl;
+            //VerboseStream(Verbose::VERBOSITY_NORMAL) << "--Parent KF is from another map" << endl;
             continue;
         }
 
-        //cout << "3" << endl;
+        //VerboseStream(Verbose::VERBOSITY_NORMAL) << "3" << endl;
 
         Trw = Trw * pKF->GetPose()*Twb; // Tcp*Tpw*Twb0=Tcb0 where b0 is the new world reference
 
-        // cout << "4" << endl;
+        // VerboseStream(Verbose::VERBOSITY_NORMAL) << "4" << endl;
 
         if (mSensor == IMU_MONOCULAR || mSensor == IMU_STEREO || mSensor==IMU_RGBD)
         {
@@ -839,9 +839,9 @@ void System::SaveTrajectoryEuRoC(const string &filename, Map* pMap)
             f << setprecision(6) << 1e9*(*lT) << " " <<  setprecision(9) << twc(0) << " " << twc(1) << " " << twc(2) << " " << q.x() << " " << q.y() << " " << q.z() << " " << q.w() << endl;
         }
 
-        // cout << "5" << endl;
+        // VerboseStream(Verbose::VERBOSITY_NORMAL) << "5" << endl;
     }
-    //cout << "end saving trajectory" << endl;
+    //VerboseStream(Verbose::VERBOSITY_NORMAL) << "end saving trajectory" << endl;
     f.close();
     VerboseStream(Verbose::VERBOSITY_NORMAL) << "End of saving trajectory to " << filename << " ...";
 }
@@ -881,7 +881,7 @@ void System::SaveTrajectoryEuRoC(const string &filename, Map* pMap)
 
     ofstream f;
     f.open(filename.c_str());
-    // cout << "file open" << endl;
+    // VerboseStream(Verbose::VERBOSITY_NORMAL) << "file open" << endl;
     f << fixed;
 
     // Frame pose is stored relative to its reference keyframe (which is optimized by BA and pose graph).
@@ -894,22 +894,22 @@ void System::SaveTrajectoryEuRoC(const string &filename, Map* pMap)
     list<double>::iterator lT = mpTracker->mlFrameTimes.begin();
     list<bool>::iterator lbL = mpTracker->mlbLost.begin();
 
-    //cout << "size mlpReferences: " << mpTracker->mlpReferences.size() << endl;
-    //cout << "size mlRelativeFramePoses: " << mpTracker->mlRelativeFramePoses.size() << endl;
-    //cout << "size mpTracker->mlFrameTimes: " << mpTracker->mlFrameTimes.size() << endl;
-    //cout << "size mpTracker->mlbLost: " << mpTracker->mlbLost.size() << endl;
+    //VerboseStream(Verbose::VERBOSITY_NORMAL) << "size mlpReferences: " << mpTracker->mlpReferences.size() << endl;
+    //VerboseStream(Verbose::VERBOSITY_NORMAL) << "size mlRelativeFramePoses: " << mpTracker->mlRelativeFramePoses.size() << endl;
+    //VerboseStream(Verbose::VERBOSITY_NORMAL) << "size mpTracker->mlFrameTimes: " << mpTracker->mlFrameTimes.size() << endl;
+    //VerboseStream(Verbose::VERBOSITY_NORMAL) << "size mpTracker->mlbLost: " << mpTracker->mlbLost.size() << endl;
 
 
     for(list<Sophus::SE3f>::iterator lit=mpTracker->mlRelativeFramePoses.begin(),
         lend=mpTracker->mlRelativeFramePoses.end();lit!=lend;lit++, lRit++, lT++, lbL++)
     {
-        //cout << "1" << endl;
+        //VerboseStream(Verbose::VERBOSITY_NORMAL) << "1" << endl;
         if(*lbL)
             continue;
 
 
         KeyFrame* pKF = *lRit;
-        //cout << "KF: " << pKF->mnId << endl;
+        //VerboseStream(Verbose::VERBOSITY_NORMAL) << "KF: " << pKF->mnId << endl;
 
         Sophus::SE3f Trw;
 
@@ -917,27 +917,27 @@ void System::SaveTrajectoryEuRoC(const string &filename, Map* pMap)
         if (!pKF)
             continue;
 
-        //cout << "2.5" << endl;
+        //VerboseStream(Verbose::VERBOSITY_NORMAL) << "2.5" << endl;
 
         while(pKF->isBad())
         {
-            //cout << " 2.bad" << endl;
+            //VerboseStream(Verbose::VERBOSITY_NORMAL) << " 2.bad" << endl;
             Trw = Trw * pKF->mTcp;
             pKF = pKF->GetParent();
-            //cout << "--Parent KF: " << pKF->mnId << endl;
+            //VerboseStream(Verbose::VERBOSITY_NORMAL) << "--Parent KF: " << pKF->mnId << endl;
         }
 
         if(!pKF || pKF->GetMap() != pBiggerMap)
         {
-            //cout << "--Parent KF is from another map" << endl;
+            //VerboseStream(Verbose::VERBOSITY_NORMAL) << "--Parent KF is from another map" << endl;
             continue;
         }
 
-        //cout << "3" << endl;
+        //VerboseStream(Verbose::VERBOSITY_NORMAL) << "3" << endl;
 
         Trw = Trw * pKF->GetPose()*Twb; // Tcp*Tpw*Twb0=Tcb0 where b0 is the new world reference
 
-        // cout << "4" << endl;
+        // VerboseStream(Verbose::VERBOSITY_NORMAL) << "4" << endl;
 
 
         if (mSensor == IMU_MONOCULAR || mSensor == IMU_STEREO || mSensor==IMU_RGBD)
@@ -959,17 +959,17 @@ void System::SaveTrajectoryEuRoC(const string &filename, Map* pMap)
             f << setprecision(6) << 1e9*(*lT) << " " <<  setprecision(9) << twc(0) << " " << twc(1) << " " << twc(2) << " " << q.x() << " " << q.y() << " " << q.z() << " " << q.w() << endl;
         }
 
-        // cout << "5" << endl;
+        // VerboseStream(Verbose::VERBOSITY_NORMAL) << "5" << endl;
     }
-    //cout << "end saving trajectory" << endl;
+    //VerboseStream(Verbose::VERBOSITY_NORMAL) << "end saving trajectory" << endl;
     f.close();
-    cout << endl << "End of saving trajectory to " << filename << " ..." << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "End of saving trajectory to " << filename << " ...";
 }*/
 
 
 /*void System::SaveKeyFrameTrajectoryEuRoC_old(const string &filename)
 {
-    cout << endl << "Saving keyframe trajectory to " << filename << " ..." << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << endl << "Saving keyframe trajectory to " << filename << " ..." << endl;
 
     vector<Map*> vpMaps = mpAtlas->GetAllMaps();
     Map* pBiggerMap;
@@ -1117,10 +1117,10 @@ void System::SaveKeyFrameTrajectoryEuRoC(const string &filename, Map* pMap)
 
 /*void System::SaveTrajectoryKITTI(const string &filename)
 {
-    cout << endl << "Saving camera trajectory to " << filename << " ..." << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "Saving camera trajectory to " << filename << " ...";
     if(mSensor==MONOCULAR)
     {
-        cerr << "ERROR: SaveTrajectoryKITTI cannot be used for monocular." << endl;
+        VerboseStream(Verbose::VERBOSITY_QUIET) << "ERROR: SaveTrajectoryKITTI cannot be used for monocular.";
         return;
     }
 
@@ -1170,7 +1170,7 @@ void System::SaveKeyFrameTrajectoryEuRoC(const string &filename, Map* pMap)
 
 void System::SaveTrajectoryKITTI(const string &filename)
 {
-    cout << endl << "Saving camera trajectory to " << filename << " ..." << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "Saving camera trajectory to " << filename << " ...";
     if(mSensor==MONOCULAR)
     {
         cerr << "ERROR: SaveTrajectoryKITTI cannot be used for monocular." << endl;
@@ -1407,9 +1407,9 @@ bool System::SaveAtlas(int type){
             //clock_t start = clock();
 
             // Save the current session
-            // cout << "Starting presave operation" << endl;
+            // VerboseStream(Verbose::VERBOSITY_NORMAL) << "Starting presave operation" << endl;
             mpAtlas->PreSave();
-            // cout << "Finished presave operation" << endl;
+            // VerboseStream(Verbose::VERBOSITY_NORMAL) << "Finished presave operation" << endl;
 
             string pathSaveFileName = "./";
             pathSaveFileName = pathSaveFileName.append(mStrSaveAtlasToFile);
@@ -1421,7 +1421,7 @@ bool System::SaveAtlas(int type){
 
             if(type == TEXT_FILE) // File text
             {
-                cout << "Starting to write the save text file to " << pathSaveFileName.c_str() << endl;
+                VerboseStream(Verbose::VERBOSITY_NORMAL) << "Starting to write the save text file to " << pathSaveFileName.c_str();
                 std::remove(pathSaveFileName.c_str());
                 std::ofstream ofs(pathSaveFileName, std::ios::binary);
                 boost::archive::text_oarchive oa(ofs);
@@ -1429,25 +1429,25 @@ bool System::SaveAtlas(int type){
                 oa << strVocabularyName;
                 oa << strVocabularyChecksum;
                 oa << mpAtlas;
-                cout << "End to write the save text file" << endl;
+                VerboseStream(Verbose::VERBOSITY_NORMAL) << "End to write the save text file";
             }
             else if(type == BINARY_FILE) // File binary
             {
-                cout << "Starting to write the save binary file to " << pathSaveFileName.c_str() << endl;
+                VerboseStream(Verbose::VERBOSITY_NORMAL) << "Starting to write the save binary file to " << pathSaveFileName.c_str();
                 std::remove(pathSaveFileName.c_str());
                 std::ofstream ofs(pathSaveFileName, std::ios::binary);
                 boost::archive::binary_oarchive oa(ofs);
                 oa << strVocabularyName;
                 oa << strVocabularyChecksum;
                 oa << mpAtlas;
-                cout << "End to write save binary file" << endl;
+                VerboseStream(Verbose::VERBOSITY_NORMAL) << "End to write save binary file";
             }
         }
     } catch (const std::exception &e) {
-        std::cerr << e.what() << std::endl;
+    VerboseStream(Verbose::VERBOSITY_QUIET) << e.what();
         return false;
     } catch (...) {
-        std::cerr << "Unknows exeption" << std::endl;
+    VerboseStream(Verbose::VERBOSITY_QUIET) << "Unknows exeption";
         return false;
     }
 
@@ -1465,34 +1465,34 @@ bool System::LoadAtlas(int type)
 
     if(type == TEXT_FILE) // File text
     {
-        cout << "Starting to read the save text file " << pathLoadFileName.c_str() << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "Starting to read the save text file " << pathLoadFileName.c_str();
         std::ifstream ifs(pathLoadFileName, std::ios::binary);
         if(!ifs.good())
         {
-            cout << "Load file not found" << endl;
+            VerboseStream(Verbose::VERBOSITY_QUIET) << "Load file not found";
             return false;
         }
         boost::archive::text_iarchive ia(ifs);
         ia >> strFileVoc;
         ia >> strVocChecksum;
         ia >> mpAtlas;
-        cout << "End to load the save text file " << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "End to load the save text file ";
         isRead = true;
     }
     else if(type == BINARY_FILE) // File binary
     {
-        cout << "Starting to read the save binary file " << pathLoadFileName.c_str() << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "Starting to read the save binary file " << pathLoadFileName.c_str();
         std::ifstream ifs(pathLoadFileName, std::ios::binary);
         if(!ifs.good())
         {
-            cout << "Load file not found" << endl;
+            VerboseStream(Verbose::VERBOSITY_QUIET) << "Load file not found";
             return false;
         }
         boost::archive::binary_iarchive ia(ifs);
         ia >> strFileVoc;
         ia >> strVocChecksum;
         ia >> mpAtlas;
-        cout << "End to load the save binary file" << endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "End to load the save binary file";
         isRead = true;
     }
 
@@ -1503,8 +1503,8 @@ bool System::LoadAtlas(int type)
 
         if(strInputVocabularyChecksum.compare(strVocChecksum) != 0)
         {
-            cout << "The vocabulary load isn't the same which the load session was created " << endl;
-            cout << "-Vocabulary name: " << strFileVoc << endl;
+            VerboseStream(Verbose::VERBOSITY_QUIET) << "The vocabulary load isn't the same which the load session was created ";
+            VerboseStream(Verbose::VERBOSITY_QUIET) << "-Vocabulary name: " << strFileVoc;
             return false; // Both are differents
         }
 
@@ -1530,7 +1530,7 @@ string System::CalculateCheckSum(string filename, int type)
     ifstream f(filename.c_str(), flags);
     if ( !f.is_open() )
     {
-        cout << "[E] Unable to open the in file " << filename << " for Md5 hash." << endl;
+        VerboseStream(Verbose::VERBOSITY_QUIET) << "[E] Unable to open the in file " << filename << " for Md5 hash.";
         return checksum;
     }
 
@@ -1620,10 +1620,10 @@ bool System::SaveCOLMAP(const string &path)
   vector<Map*> vpMaps = mpAtlas->GetAllMaps();
   int numMaxKFs = 0;
   Map* pBiggerMap;
-  std::cout << "There are " << std::to_string(vpMaps.size()) << " maps in the atlas" << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "There are " << std::to_string(vpMaps.size()) << " maps in the atlas" << std::endl;
   for(Map* pMap :vpMaps)
   {
-      std::cout << "  Map " << std::to_string(pMap->GetId()) << " has " << std::to_string(pMap->GetAllKeyFrames().size()) << " KFs" << std::endl;
+      VerboseStream(Verbose::VERBOSITY_NORMAL) << "  Map " << std::to_string(pMap->GetId()) << " has " << std::to_string(pMap->GetAllKeyFrames().size()) << " KFs" << std::endl;
       if(pMap->GetAllKeyFrames().size() > numMaxKFs)
       {
           numMaxKFs = pMap->GetAllKeyFrames().size();
@@ -1634,9 +1634,9 @@ bool System::SaveCOLMAP(const string &path)
   // create cameras.txt
   boost::filesystem::ofstream f_camera;
   const boost::filesystem::path camera_fname = pth / "sparse" / "cameras.txt";
-  std::cout << "  Writing to " << camera_fname << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "  Writing to " << camera_fname << std::endl;
   f_camera.open(camera_fname);
-  std::cout << "  file opened: " << camera_fname << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "  file opened: " << camera_fname << std::endl;
 
   //std::vector<GeometricCamera*> cams = mpAtlas->GetAllCameras();
 
@@ -1646,9 +1646,9 @@ bool System::SaveCOLMAP(const string &path)
   // create images.txt
   boost::filesystem::ofstream f_images;
   const boost::filesystem::path image_fname = pth / "sparse" / "images.txt";
-  std::cout << "  Writing to " << image_fname << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "  Writing to " << image_fname << std::endl;
   f_images.open(image_fname);
-  std::cout << "  file opened: " << image_fname << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "  file opened: " << image_fname << std::endl;
 
   vector<KeyFrame*> vpKFs = pBiggerMap->GetAllKeyFrames();
   vector<MapPoint*> allMapPoints = pBiggerMap->GetAllMapPoints();
@@ -1659,7 +1659,7 @@ bool System::SaveCOLMAP(const string &path)
     Eigen::Vector3f twb = Twb.translation();
     long long ts = 1e9*pKF->mTimeStamp;
     f_images <<  pKF->mnId  << " " <<  setprecision(9) << q.w() << " " << q.x() << " " << q.y() << " " << q.z() << " " << twb(0) << " " << twb(1) << " " << twb(2) << " 1 " << ts << ".png" << std::endl;
-    std::cout << "processing KP " << ts << ", num_keys" << pKF->mvKeys.size() << ", num_mappoints: " << pKF->GetMapPointMatches().size() << std::endl;
+    VerboseStream(Verbose::VERBOSITY_NORMAL) << "processing KP " << ts << ", num_keys" << pKF->mvKeys.size() << ", num_mappoints: " << pKF->GetMapPointMatches().size() << std::endl;
     for (size_t i=0; i < pKF->mvKeys.size(); i++) {
       cv::KeyPoint kp = pKF->mvKeys[i];
       auto mp = pKF->GetMapPoint(i);
@@ -1675,9 +1675,9 @@ bool System::SaveCOLMAP(const string &path)
   // create points3D.txt
   boost::filesystem::ofstream f_points;
   const boost::filesystem::path points_fname = pth / "sparse" / "points3D.txt";
-  std::cout << "  Writing to " << points_fname << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "  Writing to " << points_fname << std::endl;
   f_points.open(points_fname);
-  std::cout << "  file opened: " << points_fname << std::endl;
+  VerboseStream(Verbose::VERBOSITY_NORMAL) << "  file opened: " << points_fname << std::endl;
 
   for (MapPoint* mp: allMapPoints)
   {

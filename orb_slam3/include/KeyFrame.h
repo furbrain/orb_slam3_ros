@@ -34,6 +34,8 @@
 
 #include <mutex>
 
+#include "Verbose.h"
+
 #include <boost/serialization/base_object.hpp>
 #include <boost/serialization/vector.hpp>
 #include <boost/serialization/map.hpp>
@@ -533,7 +535,7 @@ public:
                 else right++;
             }
         }
-        cout << "Point distribution in KeyFrame: left-> " << left << " --- right-> " << right << endl;
+        VerboseStream(Verbose::VERBOSITY_DEBUG) << "Point distribution in KeyFrame: left-> " << left << " --- right-> " << right << std::endl;
     }
 
 

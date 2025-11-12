@@ -33,6 +33,8 @@
 #include <string>
 #include <unistd.h>
 
+#include "Verbose.h"
+
 namespace ORB_SLAM3 {
 
 class System;
@@ -136,12 +138,10 @@ private:
     cv::FileNode node = fSettings[name];
     if (node.empty()) {
       if (required) {
-        std::cerr << name << " required parameter does not exist, aborting..."
-                  << std::endl;
+        VerboseStream(Verbose::VERBOSITY_QUIET) << name << " required parameter does not exist, aborting..." << std::endl;
         exit(-1);
       } else {
-        std::cerr << name << " optional parameter does not exist..."
-                  << std::endl;
+        VerboseStream(Verbose::VERBOSITY_QUIET) << name << " optional parameter does not exist..." << std::endl;
         found = false;
         return T();
       }

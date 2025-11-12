@@ -90,7 +90,7 @@ cv::Mat ImageGrabber::GetImage(const sensor_msgs::msg::Image::ConstSharedPtr img
     }
     else
     {
-        std::cout << "Error type" << std::endl;
+        ORB_SLAM3::VerboseStream(ORB_SLAM3::Verbose::VERBOSITY_NORMAL) << "Error type" << std::endl;
         return cv_ptr->image.clone();
     }
 }

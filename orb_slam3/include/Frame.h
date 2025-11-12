@@ -39,6 +39,8 @@
 #include "Eigen/Core"
 #include "sophus/se3.hpp"
 
+#include "Verbose.h"
+
 namespace ORB_SLAM3
 {
 #define FRAME_GRID_ROWS 48
@@ -363,7 +365,7 @@ public:
                 else right++;
             }
         }
-        cout << "Point distribution in Frame: left-> " << left << " --- right-> " << right << endl;
+        VerboseStream(Verbose::VERBOSITY_DEBUG) << "Point distribution in Frame: left-> " << left << " --- right-> " << right << std::endl;
     }
 
     Sophus::SE3<double> T_test;
