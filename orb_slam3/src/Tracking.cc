@@ -2319,17 +2319,12 @@ void Tracking::StereoInitialization() {
     }
 
     // Set Frame pose to the origin (In case of inertial SLAM to imu)
-    if ((mSensor == System::IMU_STEREO || mSensor == System::IMU_RGBD) && mUseImuTrajectory) {
+    if (mSensor == System::IMU_STEREO || mSensor == System::IMU_RGBD) {
       Eigen::Matrix3f Rwb0 = mCurrentFrame.mImuCalib.mTcb.rotationMatrix();
       Eigen::Vector3f twb0 = mCurrentFrame.mImuCalib.mTcb.translation();
       Eigen::Vector3f Vwb0;
       Vwb0.setZero();
-      mCurrentFrame.SetImuPoseVelocity(Rwb0, twb0, Vwb0);
-    } else if ((mSensor == System::IMU_STEREO || mSensor == System::IMU_RGBD) && mUseImuPose) {
-      // FIXME - get pose from last IMU data
-      Eigen::Matrix3f Rwb0 = mCurrentFrame.mImuCalib.mTcb.rotationMatrix();
-      Eigen::Vector3f twb0 = mCurrentFrame.mImuCalib.mTcb.translation();
-      mCurrentFrame.SetPose(Sophus::SE3f(Rwb0, twb0));
+      mCurrentFrame.SetImuPoseVelocity(Rwb0, twb0, Vwb0); 
     } else
       mCurrentFrame.SetPose(Sophus::SE3f());
 

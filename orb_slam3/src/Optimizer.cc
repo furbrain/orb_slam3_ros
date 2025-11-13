@@ -3045,6 +3045,85 @@ Eigen::MatrixXd Optimizer::Marginalize(const Eigen::MatrixXd &H,
   return res;
 }
 
+/**
+ * @brief Perform inertial optimization over keyframe velocities, IMU biases,
+ *        gravity direction and scale using g2o.
+ *
+ * This function builds and solves a nonlinear optimization problem that
+ * incorporates IMU preintegrated measurements between consecutive keyframes,
+ * prior terms on IMU biases, an explicit gravity direction vertex, and a scale
+ * vertex (for monocular sequences). It updates the provided references with
+ * the optimized gravity rotation, scale and biases, and writes optimized
+ * velocities and biases back into the Map's KeyFrames. Optionally velocities
+ * may be held fixed during optimization.
+ *
+ * Behavior summary:
+ * - Creates a g2o::SparseOptimizer with a Levenberg-Marquardt solver and
+ *   assembles vertices:
+ *     - VertexPose for each KeyFrame pose (kept fixed here).
+ *     - VertexVelocity for each KeyFrame velocity (optimizable unless
+ *       bFixedVel==true).
+ *     - VertexGyroBias and VertexAccBias for global biases.
+ *     - VertexGDir representing gravity direction (rotation).
+ *     - VertexScale representing the global scale (free if monocular).
+ * - Adds prior edges on gyro and accelerometer biases using priorG / priorA
+ *   as information weights.
+ * - Adds EdgeInertialGS edges for each IMU preintegration between successive
+ *   KeyFrames that have valid preintegration data. Each IMU edge connects:
+ *     prev pose, prev velocity, gyro bias, acc bias, curr pose, curr
+ *     velocity, gravity direction, scale.
+ * - Runs optimization (fixed number of iterations, 200).
+ * - Extracts optimized estimates and writes:
+ *     - Updated scale and gravity rotation (Rwg).
+ *     - Updated gyro (bg) and accelerometer (ba) biases.
+ *     - Updated per-KeyFrame velocities via KeyFrame::SetVelocity().
+ *     - Updates per-KeyFrame biases via KeyFrame::SetNewBias() and,
+ *       when changed, reintegrates preintegrations via Reintegrate().
+ *
+ * Important parameters:
+ * @param pMap        Pointer to the Map containing KeyFrames and IMU
+ *                    preintegrations. Must provide GetAllKeyFrames(),
+ *                    GetMaxKFid(), and KeyFrames must contain mpImuPreintegrated
+ *                    and mPrevKF when available.
+ * @param Rwg         IN/OUT. Initial guess for gravity rotation (world->gravity).
+ *                    On return contains the optimized gravity-direction rotation.
+ * @param scale       IN/OUT. Initial scale estimate. If bMono==true the scale
+ *                    vertex is optimized; otherwise (stereo) the scale vertex
+ *                    is fixed and the value is preserved. On return contains
+ *                    the resulting scale.
+ * @param bg          OUT. Optimized gyro bias (3D).
+ * @param ba          OUT. Optimized accelerometer bias (3D).
+ * @param bMono       If true, the scale is treated as an optimizable variable
+ *                    (monocular case). If false, scale is fixed (stereo).
+ * @param covInertial Currently unused in this implementation. Reserved for
+ *                    returning or supplying the inertial covariance in future
+ *                    extensions.
+ * @param bFixedVel   If true, per-KeyFrame velocities are kept fixed and not
+ *                    optimized. Also biases are set fixed when true in this
+ *                    implementation.
+ * @param bGauss      Flag reserved for alternative noise model selection
+ *                    (Gaussian/non-Gaussian). Not used in current implementation.
+ * @param priorG      Information weight used for the gyro bias prior edge.
+ *                    If non-zero, the LM solver initial lambda is increased.
+ * @param priorA      Information weight used for the accelerometer bias prior.
+ *
+ * Side effects:
+ * - Modifies the provided Map: KeyFrame velocities and biases are updated.
+ * - May call KeyFrame::Reintegrate() for preintegrations when biases change.
+ * - Logs messages via the Verbose utilities in the project.
+ *
+ * Notes and limitations:
+ * - The function uses hard-coded vertex id layout based on the map's maximum
+ *   KeyFrame id; collisions with other uses of g2o in the same process should
+ *   be avoided.
+ * - covInertial and bGauss parameters exist in the signature but are not
+ *   currently used; they are kept for API compatibility / future use.
+ * - The optimizer runs a fixed maximum of 200 iterations.
+ * - The implementation assumes valid IMU preintegration objects exist for
+ *   edges to be created; missing preintegrations are skipped.
+ * - This routine is not thread-safe with respect to concurrent modification of
+ *   the Map or its KeyFrames.
+ */
 void Optimizer::InertialOptimization(Map *pMap, Eigen::Matrix3d &Rwg,
                                      double &scale, Eigen::Vector3d &bg,
                                      Eigen::Vector3d &ba, bool bMono,
