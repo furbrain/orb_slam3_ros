@@ -93,6 +93,10 @@ public:
     Eigen::Matrix<float,3,3> GetImuRotation();
     Sophus::SE3<float> GetImuPose();
 
+    // IMU pose estimate (quaternion) getter/setter
+    void SetImuPoseEstimate(const Eigen::Quaternionf &q);
+    Eigen::Quaternionf GetImuPoseEstimate() const;
+
     Sophus::SE3f GetRelativePoseTrl();
     Sophus::SE3f GetRelativePoseTlr();
     Eigen::Matrix3f GetRelativePoseTlr_rotation();
@@ -187,6 +191,9 @@ private:
     // IMU linear velocity
     Eigen::Vector3f mVw;
     bool mbHasVelocity;
+
+    // IMU pose estimate (quaternion)
+    Eigen::Quaternionf mImuPoseEstimate;
 
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW

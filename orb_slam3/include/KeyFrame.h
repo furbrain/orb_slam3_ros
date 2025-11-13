@@ -211,6 +211,9 @@ public:
     Eigen::Vector3f GetImuPosition();
     Eigen::Matrix3f GetImuRotation();
     Sophus::SE3f GetImuPose();
+    // IMU pose estimate (quaternion) getter/setter
+    void SetImuPoseEstimate(const Eigen::Quaternionf &q);
+    Eigen::Quaternionf GetImuPoseEstimate();
     Eigen::Matrix3f GetRotation();
     Eigen::Vector3f GetTranslation();
     Eigen::Vector3f GetVelocity();
@@ -439,6 +442,9 @@ protected:
     // Velocity (Only used for inertial SLAM)
     Eigen::Vector3f mVw;
     bool mbHasVelocity;
+
+    // IMU pose estimate (quaternion)
+    Eigen::Quaternionf mImuPoseEstimate;
 
     //Transformation matrix between cameras in stereo fisheye
     Sophus::SE3<float> mTlr;

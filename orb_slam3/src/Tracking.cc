@@ -1520,6 +1520,15 @@ void Tracking::GrabImuData(const IMU::Point &imuMeasurement) {
   mlQueueImuData.push_back(imuMeasurement);
 }
 
+void Tracking::SetImuPoseEstimate() {
+  if (mlQueueImuData.size() == 0) {
+    Verbose::PrintMess("Not IMU data in mlQueueImuData!!",
+                       Verbose::VERBOSITY_NORMAL);
+    return;
+  }
+  mCurrentFrame.SetImuPoseEstimate(mlQueueImuData.back().pose);
+}
+
 void Tracking::PreintegrateIMU() {
 
   if (!mCurrentFrame.mpPrevFrame) {
@@ -1855,8 +1864,8 @@ void Tracking::Track() {
   mLastProcessedState = mState;
 
   if ((mSensor == System::IMU_MONOCULAR || mSensor == System::IMU_STEREO ||
-       mSensor == System::IMU_RGBD) && mUseImuTrajectory && 
-      !mbCreatedMap) {
+       mSensor == System::IMU_RGBD) && !mbCreatedMap) {
+        if (mUseImuTrajectory) {
 #ifdef REGISTER_TIMES
     std::chrono::steady_clock::time_point time_StartPreIMU =
         std::chrono::steady_clock::now();
@@ -1872,7 +1881,10 @@ void Tracking::Track() {
             .count();
     vdIMUInteg_ms.push_back(timePreImu);
 #endif
-  }
+        } else if (mUseImuPose) {
+          SetImuPoseEstimate();
+        }
+      }
   mbCreatedMap = false;
 
   // Get Map Mutex -> Map cannot be changed

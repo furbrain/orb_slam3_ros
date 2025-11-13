@@ -143,7 +143,9 @@ void ImageGrabber::SyncWithImu()
                     
                     cv::Point3f gyr(mpImuGb->imuBuf.front()->angular_velocity.x, mpImuGb->imuBuf.front()->angular_velocity.y, mpImuGb->imuBuf.front()->angular_velocity.z);
 
-                    vImuMeas.push_back(ORB_SLAM3::IMU::Point(acc, gyr, t.seconds()));
+                    Eigen::Quaternionf quat(mpImuGb->imuBuf.front()->orientation.w, mpImuGb->imuBuf.front()->orientation.x,
+                                                mpImuGb->imuBuf.front()->orientation.y, mpImuGb->imuBuf.front()->orientation.z);
+                    vImuMeas.push_back(ORB_SLAM3::IMU::Point(acc, gyr, t.seconds(), quat));
                     
                     Wbb << mpImuGb->imuBuf.front()->angular_velocity.x, mpImuGb->imuBuf.front()->angular_velocity.y, mpImuGb->imuBuf.front()->angular_velocity.z;
 

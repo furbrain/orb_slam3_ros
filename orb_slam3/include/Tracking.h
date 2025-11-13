@@ -228,6 +228,9 @@ protected:
     // Perform preintegration from last frame
     void PreintegrateIMU();
 
+    // store latest pose from IMU data in frame
+    void SetImuPoseEstimate();
+
     // Reset IMU biases and compute frame velocity
     void ResetFrameIMU();
 

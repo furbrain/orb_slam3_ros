@@ -71,7 +71,7 @@ Frame::Frame(const Frame &frame)
      monoLeft(frame.monoLeft), monoRight(frame.monoRight), mvLeftToRightMatch(frame.mvLeftToRightMatch),
      mvRightToLeftMatch(frame.mvRightToLeftMatch), mvStereo3Dpoints(frame.mvStereo3Dpoints),
      mTlr(frame.mTlr), mRlr(frame.mRlr), mtlr(frame.mtlr), mTrl(frame.mTrl),
-     mTcw(frame.mTcw), mbHasPose(false), mbHasVelocity(false)
+     mImuPoseEstimate(frame.mImuPoseEstimate), mTcw(frame.mTcw), mbHasPose(false), mbHasVelocity(false)
 {
     for(int i=0;i<FRAME_GRID_COLS;i++)
         for(int j=0; j<FRAME_GRID_ROWS; j++){
@@ -468,6 +468,16 @@ void Frame::SetImuPoseVelocity(const Eigen::Matrix3f &Rwb, const Eigen::Vector3f
     UpdatePoseMatrices();
     mbIsSet = true;
     mbHasPose = true;
+}
+
+void Frame::SetImuPoseEstimate(const Eigen::Quaternionf &q)
+{
+    mImuPoseEstimate = q;
+}
+
+Eigen::Quaternionf Frame::GetImuPoseEstimate() const
+{
+    return mImuPoseEstimate;
 }
 
 void Frame::UpdatePoseMatrices()

@@ -54,7 +54,7 @@ KeyFrame::KeyFrame(Frame &F, Map *pMap, KeyFrameDatabase *pKFDB):
     mBowVec(F.mBowVec), mFeatVec(F.mFeatVec), mnScaleLevels(F.mnScaleLevels), mfScaleFactor(F.mfScaleFactor),
     mfLogScaleFactor(F.mfLogScaleFactor), mvScaleFactors(F.mvScaleFactors), mvLevelSigma2(F.mvLevelSigma2),
     mvInvLevelSigma2(F.mvInvLevelSigma2), mnMinX(F.mnMinX), mnMinY(F.mnMinY), mnMaxX(F.mnMaxX),
-    mnMaxY(F.mnMaxY), mK_(F.mK_), mPrevKF(NULL), mNextKF(NULL), mpImuPreintegrated(F.mpImuPreintegrated),
+    mnMaxY(F.mnMaxY), mK_(F.mK_), mPrevKF(NULL), mNextKF(NULL), mpImuPreintegrated(F.mpImuPreintegrated), mImuPoseEstimate(F.GetImuPoseEstimate()),
     mImuCalib(F.mImuCalib), mvpMapPoints(F.mvpMapPoints), mpKeyFrameDB(pKFDB),
     mpORBvocabulary(F.mpORBvocabulary), mbFirstConnection(true), mpParent(NULL), mDistCoef(F.mDistCoef), mbNotErase(false), mnDataset(F.mnDataset),
     mbToBeErased(false), mbBad(false), mHalfBaseline(F.mb/2), mpMap(pMap), mbCurrentPlaceRecognition(false), mNameFile(F.mNameFile), mnMergeCorrectedForKF(0),
@@ -162,6 +162,18 @@ Sophus::SE3f KeyFrame::GetImuPose()
 {
     unique_lock<mutex> lock(mMutexPose);
     return mTwc * mImuCalib.mTcb;
+}
+
+void KeyFrame::SetImuPoseEstimate(const Eigen::Quaternionf &q)
+{
+    unique_lock<mutex> lock(mMutexPose);
+    mImuPoseEstimate = q;
+}
+
+Eigen::Quaternionf KeyFrame::GetImuPoseEstimate()
+{
+    unique_lock<mutex> lock(mMutexPose);
+    return mImuPoseEstimate;
 }
 
 Eigen::Matrix3f KeyFrame::GetRotation(){
