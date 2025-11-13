@@ -160,7 +160,7 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     }
 
 
-    if (mSensor==IMU_STEREO || mSensor==IMU_MONOCULAR || mSensor==IMU_RGBD)
+    if ((mSensor==IMU_STEREO || mSensor==IMU_MONOCULAR || mSensor==IMU_RGBD) && settings_->useImuTrajectory())
         mpAtlas->SetInertialSensor();
 
     //Create Drawers. These are used by the Viewer
@@ -174,7 +174,7 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
 
     //Initialize the Local Mapping thread and launch
     mpLocalMapper = new LocalMapping(this, mpAtlas, mSensor==MONOCULAR || mSensor==IMU_MONOCULAR,
-                                     mSensor==IMU_MONOCULAR || mSensor==IMU_STEREO || mSensor==IMU_RGBD, strSequence);
+                                     (mSensor==IMU_MONOCULAR || mSensor==IMU_STEREO || mSensor==IMU_RGBD) && settings_->useImuTrajectory(), strSequence);
     mptLocalMapping = new thread(&ORB_SLAM3::LocalMapping::Run,mpLocalMapper);
     mpLocalMapper->mInitFr = initFr;
     if(settings_)
@@ -654,7 +654,7 @@ void System::SaveTrajectoryEuRoC(const string &filename)
     // Transform all keyframes so that the first keyframe is at the origin.
     // After a loop closure the first keyframe might not be at the origin.
     Sophus::SE3f Twb; // Can be word to cam0 or world to b depending on IMU or not.
-    if (mSensor==IMU_MONOCULAR || mSensor==IMU_STEREO || mSensor==IMU_RGBD)
+    if ((mSensor==IMU_MONOCULAR || mSensor==IMU_STEREO || mSensor==IMU_RGBD) && settings_->useImuTrajectory())
         Twb = vpKFs[0]->GetImuPose();
     else
         Twb = vpKFs[0]->GetPoseInverse();
@@ -719,7 +719,7 @@ void System::SaveTrajectoryEuRoC(const string &filename)
 
         // VerboseStream(Verbose::VERBOSITY_NORMAL) << "4" << endl;
 
-        if (mSensor == IMU_MONOCULAR || mSensor == IMU_STEREO || mSensor==IMU_RGBD)
+        if ((mSensor == IMU_MONOCULAR || mSensor == IMU_STEREO || mSensor==IMU_RGBD) && settings_->useImuTrajectory())
         {
             Sophus::SE3f Twb = (pKF->mImuCalib.mTbc * (*lit) * Trw).inverse();
             Eigen::Quaternionf q = Twb.unit_quaternion();
@@ -759,7 +759,7 @@ void System::SaveTrajectoryEuRoC(const string &filename, Map* pMap)
     // Transform all keyframes so that the first keyframe is at the origin.
     // After a loop closure the first keyframe might not be at the origin.
     Sophus::SE3f Twb; // Can be word to cam0 or world to b dependingo on IMU or not.
-    if (mSensor==IMU_MONOCULAR || mSensor==IMU_STEREO || mSensor==IMU_RGBD)
+    if ((mSensor==IMU_MONOCULAR || mSensor==IMU_STEREO || mSensor==IMU_RGBD) && settings_->useImuTrajectory())
         Twb = vpKFs[0]->GetImuPose();
     else
         Twb = vpKFs[0]->GetPoseInverse();
@@ -824,7 +824,7 @@ void System::SaveTrajectoryEuRoC(const string &filename, Map* pMap)
 
         // VerboseStream(Verbose::VERBOSITY_NORMAL) << "4" << endl;
 
-        if (mSensor == IMU_MONOCULAR || mSensor == IMU_STEREO || mSensor==IMU_RGBD)
+        if ((mSensor == IMU_MONOCULAR || mSensor == IMU_STEREO || mSensor==IMU_RGBD) && settings_->useImuTrajectory())
         {
             Sophus::SE3f Twb = (pKF->mImuCalib.mTbc * (*lit) * Trw).inverse();
             Eigen::Quaternionf q = Twb.unit_quaternion();
@@ -874,7 +874,7 @@ void System::SaveTrajectoryEuRoC(const string &filename, Map* pMap)
     // Transform all keyframes so that the first keyframe is at the origin.
     // After a loop closure the first keyframe might not be at the origin.
     Sophus::SE3f Twb; // Can be word to cam0 or world to b dependingo on IMU or not.
-    if (mSensor==IMU_MONOCULAR || mSensor==IMU_STEREO || mSensor==IMU_RGBD)
+    if ((mSensor==IMU_MONOCULAR || mSensor==IMU_STEREO || mSensor==IMU_RGBD) && settings_->useImuTrajectory())
         Twb = vpKFs[0]->GetImuPose_();
     else
         Twb = vpKFs[0]->GetPoseInverse_();
@@ -940,7 +940,7 @@ void System::SaveTrajectoryEuRoC(const string &filename, Map* pMap)
         // VerboseStream(Verbose::VERBOSITY_NORMAL) << "4" << endl;
 
 
-        if (mSensor == IMU_MONOCULAR || mSensor == IMU_STEREO || mSensor==IMU_RGBD)
+        if ((mSensor == IMU_MONOCULAR || mSensor == IMU_STEREO || mSensor==IMU_RGBD) && settings_->useImuTrajectory())
         {
             Sophus::SE3f Tbw = pKF->mImuCalib.Tbc_ * (*lit) * Trw;
             Sophus::SE3f Twb = Tbw.inverse();
@@ -1000,7 +1000,7 @@ void System::SaveTrajectoryEuRoC(const string &filename, Map* pMap)
 
         if(pKF->isBad())
             continue;
-        if (mSensor == IMU_MONOCULAR || mSensor == IMU_STEREO || mSensor==IMU_RGBD)
+        if ((mSensor == IMU_MONOCULAR || mSensor == IMU_STEREO || mSensor==IMU_RGBD) && settings_->useImuTrajectory())
         {
             cv::Mat R = pKF->GetImuRotation().t();
             vector<float> q = Converter::toQuaternion(R);
@@ -1058,7 +1058,7 @@ void System::SaveKeyFrameTrajectoryEuRoC(const string &filename)
 
         if(!pKF || pKF->isBad())
             continue;
-        if (mSensor == IMU_MONOCULAR || mSensor == IMU_STEREO || mSensor==IMU_RGBD)
+        if ((mSensor == IMU_MONOCULAR || mSensor == IMU_STEREO || mSensor==IMU_RGBD) && settings_->useImuTrajectory())
         {
             Sophus::SE3f Twb = pKF->GetImuPose();
             Eigen::Quaternionf q = Twb.unit_quaternion();
@@ -1096,7 +1096,7 @@ void System::SaveKeyFrameTrajectoryEuRoC(const string &filename, Map* pMap)
 
         if(!pKF || pKF->isBad())
             continue;
-        if (mSensor == IMU_MONOCULAR || mSensor == IMU_STEREO || mSensor==IMU_RGBD)
+        if ((mSensor == IMU_MONOCULAR || mSensor == IMU_STEREO || mSensor==IMU_RGBD) && settings_->useImuTrajectory())
         {
             Sophus::SE3f Twb = pKF->GetImuPose();
             Eigen::Quaternionf q = Twb.unit_quaternion();
@@ -1580,7 +1580,7 @@ vector<Sophus::SE3f> System::GetAllKeyframePoses()
 
         // Twb can be world frame to cam0 frame (without IMU) or body in world frame (with IMU)
         Sophus::SE3f Twb;
-        if (mSensor == IMU_MONOCULAR || mSensor == IMU_STEREO || mSensor == IMU_RGBD) // with IMU
+        if ((mSensor == IMU_MONOCULAR || mSensor == IMU_STEREO || mSensor == IMU_RGBD) && settings_->useImuTrajectory()) // with IMU
             Twb = vpKFs[i]->GetImuPose();
         else // without IMU
             Twb = vpKFs[i]->GetPoseInverse();
