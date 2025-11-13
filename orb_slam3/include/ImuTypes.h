@@ -44,18 +44,21 @@ namespace IMU
 
 const float GRAVITY_VALUE=9.81;
 
-//IMU measurement (gyro, accelerometer and timestamp)
+//IMU measurement (gyro, accelerometer, pose, and timestamp)
 class Point
 {
 public:
     Point(const float &acc_x, const float &acc_y, const float &acc_z,
              const float &ang_vel_x, const float &ang_vel_y, const float &ang_vel_z,
-             const double &timestamp): a(acc_x,acc_y,acc_z), w(ang_vel_x,ang_vel_y,ang_vel_z), t(timestamp){}
-    Point(const cv::Point3f Acc, const cv::Point3f Gyro, const double &timestamp):
-        a(Acc.x,Acc.y,Acc.z), w(Gyro.x,Gyro.y,Gyro.z), t(timestamp){}
+             const double &timestamp,
+             const float &quat_w = 1.0, const float &quat_x = 0, const float &quat_y = 0, const float &quat_z = 0): 
+             a(acc_x,acc_y,acc_z), w(ang_vel_x,ang_vel_y,ang_vel_z), pose(quat_w, quat_x, quat_y, quat_z), t(timestamp){}
+    Point(const cv::Point3f Acc, const cv::Point3f Gyro, const double &timestamp, const Eigen::Quaternionf &Q = Eigen::Quaternionf::Identity()):
+        a(Acc.x,Acc.y,Acc.z), w(Gyro.x,Gyro.y,Gyro.z), pose(Q), t(timestamp){}
 public:
     Eigen::Vector3f a;
     Eigen::Vector3f w;
+    Eigen::Quaternionf pose;
     double t;
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
