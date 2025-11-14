@@ -90,6 +90,10 @@ public:
         return mpLastKeyFrame;
     }
 
+    // Expose IMU usage flags loaded from Settings
+    bool UseImuTrajectory() const { return mUseImuTrajectory; }
+    bool UseImuPose() const { return mUseImuPose; }
+
     Sophus::SE3f GetCamTwc();
     Sophus::SE3f GetImuTwb();
     Eigen::Vector3f GetImuVwb();
