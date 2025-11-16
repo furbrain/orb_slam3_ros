@@ -48,6 +48,127 @@ bool sortByVal(const pair<MapPoint *, int> &a, const pair<MapPoint *, int> &b) {
   return (a.second < b.second);
 }
 
+namespace {
+inline void setEdgeVertices(g2o::OptimizableGraph::Edge *e,
+                            g2o::SparseOptimizer &optimizer, int v0,
+                            int v1) {
+  e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
+                         optimizer.vertex(v0)));
+  e->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
+                         optimizer.vertex(v1)));
+}
+
+inline void setHuberIfNeeded(g2o::OptimizableGraph::Edge *e, bool bRobust,
+                             double delta) {
+  if (bRobust) {
+    g2o::RobustKernelHuber *rk = new g2o::RobustKernelHuber;
+    e->setRobustKernel(rk);
+    rk->setDelta(delta);
+  }
+}
+
+template <typename EdgeT>
+inline void setEdgeVertex0(EdgeT *e, g2o::SparseOptimizer &optimizer,
+              int v0) {
+  static_cast<g2o::OptimizableGraph::Edge *>(e)->setVertex(
+    0, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
+       optimizer.vertex(v0)));
+}
+
+
+template <typename EdgeT, typename ObsT>
+inline void initEdge2V01(EdgeT *e, g2o::SparseOptimizer &optimizer, int v0,
+                        int v1, const ObsT &obs, double invSigma2,
+                        double delta, bool bRobust) {
+  setEdgeVertices(static_cast<g2o::OptimizableGraph::Edge *>(e), optimizer,
+                  v0, v1);
+  e->setMeasurement(obs);
+  e->setInformation(Eigen::Matrix2d::Identity() * invSigma2);
+  setHuberIfNeeded(static_cast<g2o::OptimizableGraph::Edge *>(e), bRobust,
+                    delta);
+}
+
+template <typename EdgeT, typename ObsT>
+inline void initEdge2V0(EdgeT *e, g2o::SparseOptimizer &optimizer, int v0,
+                       const ObsT &obs, double invSigma2, double delta,
+                       bool bRobust) {
+  static_cast<g2o::OptimizableGraph::Edge *>(e)->setVertex(
+      0, dynamic_cast<g2o::OptimizableGraph::Vertex *>(optimizer.vertex(v0)));
+  e->setMeasurement(obs);
+  e->setInformation(Eigen::Matrix2d::Identity() * invSigma2);
+  setHuberIfNeeded(static_cast<g2o::OptimizableGraph::Edge *>(e), bRobust,
+                    delta);
+}
+
+template <typename EdgeT, typename ObsT>
+inline void initEdge3V01(EdgeT *e, g2o::SparseOptimizer &optimizer, int v0,
+                        int v1, const ObsT &obs, double invSigma2,
+                        double delta, bool bRobust) {
+  setEdgeVertices(static_cast<g2o::OptimizableGraph::Edge *>(e), optimizer,
+                  v0, v1);
+  e->setMeasurement(obs);
+  Eigen::Matrix3d Info = Eigen::Matrix3d::Identity() * invSigma2;
+  e->setInformation(Info);
+  setHuberIfNeeded(static_cast<g2o::OptimizableGraph::Edge *>(e), bRobust,
+                    delta);
+}
+
+template <typename EdgeT, typename ObsT>
+inline void initEdge3V0(EdgeT *e, g2o::SparseOptimizer &optimizer, int v0,
+                       const ObsT &obs, double invSigma2, double delta,
+                       bool bRobust) {
+  static_cast<g2o::OptimizableGraph::Edge *>(e)->setVertex(
+      0, dynamic_cast<g2o::OptimizableGraph::Vertex *>(optimizer.vertex(v0)));
+  e->setMeasurement(obs);
+  Eigen::Matrix3d Info = Eigen::Matrix3d::Identity() * invSigma2;
+  e->setInformation(Info);
+  setHuberIfNeeded(static_cast<g2o::OptimizableGraph::Edge *>(e), bRobust,
+                    delta);
+}
+
+
+template <typename EdgeT, typename ObsT>
+inline void initEdge2V0_ptr(EdgeT *e, g2o::OptimizableGraph::Vertex *v0,
+                           const ObsT &obs, double invSigma2, double delta,
+                           bool bRobust) {
+  static_cast<g2o::OptimizableGraph::Edge *>(e)->setVertex(0, v0);
+  e->setMeasurement(obs);
+  e->setInformation(Eigen::Matrix2d::Identity() * invSigma2);
+  setHuberIfNeeded(static_cast<g2o::OptimizableGraph::Edge *>(e), bRobust,
+                   delta);
+}
+
+template <typename EdgeT, typename ObsT>
+inline void initEdge3V0_ptr(EdgeT *e, g2o::OptimizableGraph::Vertex *v0,
+                           const ObsT &obs, double invSigma2, double delta,
+                           bool bRobust) {
+  static_cast<g2o::OptimizableGraph::Edge *>(e)->setVertex(0, v0);
+  e->setMeasurement(obs);
+  Eigen::Matrix3d Info = Eigen::Matrix3d::Identity() * invSigma2;
+  e->setInformation(Info);
+  setHuberIfNeeded(static_cast<g2o::OptimizableGraph::Edge *>(e), bRobust,
+                   delta);
+}
+
+void addVertexFromKF(g2o::SparseOptimizer &optimizer, KeyFrame *pKF, bool fixed_from_kf, bool id_from_kf = true, bool fixed = false) {
+  g2o::VertexSE3Expmap *vSE3 = new g2o::VertexSE3Expmap();
+  Sophus::SE3<float> Tcw = pKF->GetPose();
+  vSE3->setEstimate(g2o::SE3Quat(Tcw.unit_quaternion().cast<double>(),
+                                 Tcw.translation().cast<double>()));
+  if (id_from_kf) {
+    vSE3->setId(pKF->mnId);
+  } else {
+    vSE3->setId(0); 
+  }
+  if (fixed_from_kf) {
+    vSE3->setFixed(pKF->mnId == pKF->GetMap()->GetInitKFid());
+  } else {
+    vSE3->setFixed(fixed);
+  }
+  optimizer.addVertex(vSE3);
+}
+} // anonymous namespace
+
 void Optimizer::GlobalBundleAdjustemnt(Map *pMap, int nIterations,
                                        bool *pbStopFlag,
                                        const unsigned long nLoopKF,
@@ -120,13 +241,7 @@ void Optimizer::BundleAdjustment(const vector<KeyFrame *> &vpKFs,
     KeyFrame *pKF = vpKFs[i];
     if (pKF->isBad())
       continue;
-    g2o::VertexSE3Expmap *vSE3 = new g2o::VertexSE3Expmap();
-    Sophus::SE3<float> Tcw = pKF->GetPose();
-    vSE3->setEstimate(g2o::SE3Quat(Tcw.unit_quaternion().cast<double>(),
-                                   Tcw.translation().cast<double>()));
-    vSE3->setId(pKF->mnId);
-    vSE3->setFixed(pKF->mnId == pMap->GetInitKFid());
-    optimizer.addVertex(vSE3);
+    addVertexFromKF(optimizer, pKF, true);
     if (pKF->mnId > maxKFid)
       maxKFid = pKF->mnId;
   }
@@ -171,19 +286,8 @@ void Optimizer::BundleAdjustment(const vector<KeyFrame *> &vpKFs,
 
         ORB_SLAM3::EdgeSE3ProjectXYZ *e = new ORB_SLAM3::EdgeSE3ProjectXYZ();
 
-        e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
-                            optimizer.vertex(id)));
-        e->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
-                            optimizer.vertex(pKF->mnId)));
-        e->setMeasurement(obs);
-        const float &invSigma2 = pKF->mvInvLevelSigma2[kpUn.octave];
-        e->setInformation(Eigen::Matrix2d::Identity() * invSigma2);
-
-        if (bRobust) {
-          g2o::RobustKernelHuber *rk = new g2o::RobustKernelHuber;
-          e->setRobustKernel(rk);
-          rk->setDelta(thHuber2D);
-        }
+        initEdge2V01(e, optimizer, id, pKF->mnId, obs,
+        pKF->mvInvLevelSigma2[kpUn.octave], thHuber2D, bRobust);
 
         e->pCamera = pKF->mpCamera;
 
@@ -203,20 +307,8 @@ void Optimizer::BundleAdjustment(const vector<KeyFrame *> &vpKFs,
 
         g2o::EdgeStereoSE3ProjectXYZ *e = new g2o::EdgeStereoSE3ProjectXYZ();
 
-        e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
-                            optimizer.vertex(id)));
-        e->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
-                            optimizer.vertex(pKF->mnId)));
-        e->setMeasurement(obs);
-        const float &invSigma2 = pKF->mvInvLevelSigma2[kpUn.octave];
-        Eigen::Matrix3d Info = Eigen::Matrix3d::Identity() * invSigma2;
-        e->setInformation(Info);
-
-        if (bRobust) {
-          g2o::RobustKernelHuber *rk = new g2o::RobustKernelHuber;
-          e->setRobustKernel(rk);
-          rk->setDelta(thHuber3D);
-        }
+        initEdge3V01(e, optimizer, id, pKF->mnId, obs,
+        pKF->mvInvLevelSigma2[kpUn.octave], thHuber3D, bRobust);
 
         e->fx = pKF->fx;
         e->fy = pKF->fy;
@@ -244,17 +336,8 @@ void Optimizer::BundleAdjustment(const vector<KeyFrame *> &vpKFs,
           ORB_SLAM3::EdgeSE3ProjectXYZToBody *e =
               new ORB_SLAM3::EdgeSE3ProjectXYZToBody();
 
-          e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
-                              optimizer.vertex(id)));
-          e->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
-                              optimizer.vertex(pKF->mnId)));
-          e->setMeasurement(obs);
-          const float &invSigma2 = pKF->mvInvLevelSigma2[kp.octave];
-          e->setInformation(Eigen::Matrix2d::Identity() * invSigma2);
-
-          g2o::RobustKernelHuber *rk = new g2o::RobustKernelHuber;
-          e->setRobustKernel(rk);
-          rk->setDelta(thHuber2D);
+          initEdge2V01(e, optimizer, id, pKF->mnId, obs,
+                      pKF->mvInvLevelSigma2[kp.octave], thHuber2D, bRobust);
 
           Sophus::SE3f Trl = pKF->GetRelativePoseTrl();
           e->mTrl = g2o::SE3Quat(Trl.unit_quaternion().cast<double>(),
@@ -627,17 +710,8 @@ void Optimizer::FullInertialBA(Map *pMap, int its, const bool bFixLocal,
             if (!VP->fixed())
               bAllFixed = false;
 
-          e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
-                              optimizer.vertex(id)));
-          e->setVertex(1, VP);
-          e->setMeasurement(obs);
-          const float invSigma2 = pKFi->mvInvLevelSigma2[kpUn.octave];
-
-          e->setInformation(Eigen::Matrix2d::Identity() * invSigma2);
-
-          g2o::RobustKernelHuber *rk = new g2o::RobustKernelHuber;
-          e->setRobustKernel(rk);
-          rk->setDelta(thHuberMono);
+          initEdge2V01(e, optimizer, id, pKFi->mnId, obs,
+                      pKFi->mvInvLevelSigma2[kpUn.octave], thHuberMono, true);
 
           optimizer.addEdge(e);
         } else if (leftIndex != -1 &&
@@ -657,17 +731,8 @@ void Optimizer::FullInertialBA(Map *pMap, int its, const bool bFixLocal,
             if (!VP->fixed())
               bAllFixed = false;
 
-          e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
-                              optimizer.vertex(id)));
-          e->setVertex(1, VP);
-          e->setMeasurement(obs);
-          const float invSigma2 = pKFi->mvInvLevelSigma2[kpUn.octave];
-
-          e->setInformation(Eigen::Matrix3d::Identity() * invSigma2);
-
-          g2o::RobustKernelHuber *rk = new g2o::RobustKernelHuber;
-          e->setRobustKernel(rk);
-          rk->setDelta(thHuberStereo);
+          initEdge3V01(e, optimizer, id, pKFi->mnId, obs,
+                      pKFi->mvInvLevelSigma2[kpUn.octave], thHuberStereo, true);
 
           optimizer.addEdge(e);
         }
@@ -691,16 +756,8 @@ void Optimizer::FullInertialBA(Map *pMap, int its, const bool bFixLocal,
               if (!VP->fixed())
                 bAllFixed = false;
 
-            e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
-                                optimizer.vertex(id)));
-            e->setVertex(1, VP);
-            e->setMeasurement(obs);
-            const float invSigma2 = pKFi->mvInvLevelSigma2[kpUn.octave];
-            e->setInformation(Eigen::Matrix2d::Identity() * invSigma2);
-
-            g2o::RobustKernelHuber *rk = new g2o::RobustKernelHuber;
-            e->setRobustKernel(rk);
-            rk->setDelta(thHuberMono);
+            initEdge2V01(e, optimizer, id, pKFi->mnId, obs,
+                        pKFi->mvInvLevelSigma2[kpUn.octave], thHuberMono, true);
 
             optimizer.addEdge(e);
           }
@@ -850,18 +907,11 @@ int Optimizer::PoseOptimization(Frame *pFrame) {
             const cv::KeyPoint &kpUn = pFrame->mvKeysUn[i];
             obs << kpUn.pt.x, kpUn.pt.y;
 
-            ORB_SLAM3::EdgeSE3ProjectXYZOnlyPose *e =
-                new ORB_SLAM3::EdgeSE3ProjectXYZOnlyPose();
+      ORB_SLAM3::EdgeSE3ProjectXYZOnlyPose *e =
+        new ORB_SLAM3::EdgeSE3ProjectXYZOnlyPose();
 
-            e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
-                                optimizer.vertex(0)));
-            e->setMeasurement(obs);
-            const float invSigma2 = pFrame->mvInvLevelSigma2[kpUn.octave];
-            e->setInformation(Eigen::Matrix2d::Identity() * invSigma2);
-
-            g2o::RobustKernelHuber *rk = new g2o::RobustKernelHuber;
-            e->setRobustKernel(rk);
-            rk->setDelta(deltaMono);
+      initEdge2V0(e, optimizer, 0, obs,
+             pFrame->mvInvLevelSigma2[kpUn.octave], deltaMono, true);
 
             e->pCamera = pFrame->mpCamera;
             e->Xw = pMP->GetWorldPos().cast<double>();
@@ -880,19 +930,12 @@ int Optimizer::PoseOptimization(Frame *pFrame) {
             const float &kp_ur = pFrame->mvuRight[i];
             obs << kpUn.pt.x, kpUn.pt.y, kp_ur;
 
-            g2o::EdgeStereoSE3ProjectXYZOnlyPose *e =
-                new g2o::EdgeStereoSE3ProjectXYZOnlyPose();
+      g2o::EdgeStereoSE3ProjectXYZOnlyPose *e =
+        new g2o::EdgeStereoSE3ProjectXYZOnlyPose();
 
-            e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
-                                optimizer.vertex(0)));
-            e->setMeasurement(obs);
-            const float invSigma2 = pFrame->mvInvLevelSigma2[kpUn.octave];
-            Eigen::Matrix3d Info = Eigen::Matrix3d::Identity() * invSigma2;
-            e->setInformation(Info);
-
-            g2o::RobustKernelHuber *rk = new g2o::RobustKernelHuber;
-            e->setRobustKernel(rk);
-            rk->setDelta(deltaStereo);
+      initEdge3V0(e, optimizer, 0, obs,
+             pFrame->mvInvLevelSigma2[kpUn.octave], deltaStereo,
+             true);
 
             e->fx = pFrame->fx;
             e->fy = pFrame->fy;
@@ -921,18 +964,11 @@ int Optimizer::PoseOptimization(Frame *pFrame) {
             Eigen::Matrix<double, 2, 1> obs;
             obs << kpUn.pt.x, kpUn.pt.y;
 
-            ORB_SLAM3::EdgeSE3ProjectXYZOnlyPose *e =
-                new ORB_SLAM3::EdgeSE3ProjectXYZOnlyPose();
+      ORB_SLAM3::EdgeSE3ProjectXYZOnlyPose *e =
+        new ORB_SLAM3::EdgeSE3ProjectXYZOnlyPose();
 
-            e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
-                                optimizer.vertex(0)));
-            e->setMeasurement(obs);
-            const float invSigma2 = pFrame->mvInvLevelSigma2[kpUn.octave];
-            e->setInformation(Eigen::Matrix2d::Identity() * invSigma2);
-
-            g2o::RobustKernelHuber *rk = new g2o::RobustKernelHuber;
-            e->setRobustKernel(rk);
-            rk->setDelta(deltaMono);
+      initEdge2V0(e, optimizer, 0, obs,
+             pFrame->mvInvLevelSigma2[kpUn.octave], deltaMono, true);
 
             e->pCamera = pFrame->mpCamera;
             e->Xw = pMP->GetWorldPos().cast<double>();
@@ -949,18 +985,11 @@ int Optimizer::PoseOptimization(Frame *pFrame) {
 
             pFrame->mvbOutlier[i] = false;
 
-            ORB_SLAM3::EdgeSE3ProjectXYZOnlyPoseToBody *e =
-                new ORB_SLAM3::EdgeSE3ProjectXYZOnlyPoseToBody();
+      ORB_SLAM3::EdgeSE3ProjectXYZOnlyPoseToBody *e =
+        new ORB_SLAM3::EdgeSE3ProjectXYZOnlyPoseToBody();
 
-            e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
-                                optimizer.vertex(0)));
-            e->setMeasurement(obs);
-            const float invSigma2 = pFrame->mvInvLevelSigma2[kpUn.octave];
-            e->setInformation(Eigen::Matrix2d::Identity() * invSigma2);
-
-            g2o::RobustKernelHuber *rk = new g2o::RobustKernelHuber;
-            e->setRobustKernel(rk);
-            rk->setDelta(deltaMono);
+      initEdge2V0(e, optimizer, 0, obs,
+             pFrame->mvInvLevelSigma2[kpUn.octave], deltaMono, true);
 
             e->pCamera = pFrame->mpCamera2;
             e->Xw = pMP->GetWorldPos().cast<double>();
@@ -1191,13 +1220,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame *pKF, bool *pbStopFlag,
                                   lend = lLocalKeyFrames.end();
        lit != lend; lit++) {
     KeyFrame *pKFi = *lit;
-    g2o::VertexSE3Expmap *vSE3 = new g2o::VertexSE3Expmap();
-    Sophus::SE3<float> Tcw = pKFi->GetPose();
-    vSE3->setEstimate(g2o::SE3Quat(Tcw.unit_quaternion().cast<double>(),
-                                   Tcw.translation().cast<double>()));
-    vSE3->setId(pKFi->mnId);
-    vSE3->setFixed(pKFi->mnId == pMap->GetInitKFid());
-    optimizer.addVertex(vSE3);
+    addVertexFromKF(optimizer, pKFi, true);
     if (pKFi->mnId > maxKFid)
       maxKFid = pKFi->mnId;
     // DEBUG LBA
@@ -1210,13 +1233,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame *pKF, bool *pbStopFlag,
                                   lend = lFixedCameras.end();
        lit != lend; lit++) {
     KeyFrame *pKFi = *lit;
-    g2o::VertexSE3Expmap *vSE3 = new g2o::VertexSE3Expmap();
-    Sophus::SE3<float> Tcw = pKFi->GetPose();
-    vSE3->setEstimate(g2o::SE3Quat(Tcw.unit_quaternion().cast<double>(),
-                                   Tcw.translation().cast<double>()));
-    vSE3->setId(pKFi->mnId);
-    vSE3->setFixed(true);
-    optimizer.addVertex(vSE3);
+    addVertexFromKF(optimizer, pKFi, false, true, true);
     if (pKFi->mnId > maxKFid)
       maxKFid = pKFi->mnId;
     // DEBUG LBA
@@ -1294,17 +1311,8 @@ void Optimizer::LocalBundleAdjustment(KeyFrame *pKF, bool *pbStopFlag,
 
           ORB_SLAM3::EdgeSE3ProjectXYZ *e = new ORB_SLAM3::EdgeSE3ProjectXYZ();
 
-          e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
-                              optimizer.vertex(id)));
-          e->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
-                              optimizer.vertex(pKFi->mnId)));
-          e->setMeasurement(obs);
-          const float &invSigma2 = pKFi->mvInvLevelSigma2[kpUn.octave];
-          e->setInformation(Eigen::Matrix2d::Identity() * invSigma2);
-
-          g2o::RobustKernelHuber *rk = new g2o::RobustKernelHuber;
-          e->setRobustKernel(rk);
-          rk->setDelta(thHuberMono);
+          initEdge2V01(e, optimizer, id, pKFi->mnId, obs,
+                      pKFi->mvInvLevelSigma2[kpUn.octave], thHuberMono, true);
 
           e->pCamera = pKFi->mpCamera;
 
@@ -1324,18 +1332,9 @@ void Optimizer::LocalBundleAdjustment(KeyFrame *pKF, bool *pbStopFlag,
 
           g2o::EdgeStereoSE3ProjectXYZ *e = new g2o::EdgeStereoSE3ProjectXYZ();
 
-          e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
-                              optimizer.vertex(id)));
-          e->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
-                              optimizer.vertex(pKFi->mnId)));
-          e->setMeasurement(obs);
-          const float &invSigma2 = pKFi->mvInvLevelSigma2[kpUn.octave];
-          Eigen::Matrix3d Info = Eigen::Matrix3d::Identity() * invSigma2;
-          e->setInformation(Info);
-
-          g2o::RobustKernelHuber *rk = new g2o::RobustKernelHuber;
-          e->setRobustKernel(rk);
-          rk->setDelta(thHuberStereo);
+          initEdge3V01(e, optimizer, id, pKFi->mnId, obs,
+                      pKFi->mvInvLevelSigma2[kpUn.octave], thHuberStereo,
+                      true);
 
           e->fx = pKFi->fx;
           e->fy = pKFi->fy;
@@ -1364,17 +1363,8 @@ void Optimizer::LocalBundleAdjustment(KeyFrame *pKF, bool *pbStopFlag,
             ORB_SLAM3::EdgeSE3ProjectXYZToBody *e =
                 new ORB_SLAM3::EdgeSE3ProjectXYZToBody();
 
-            e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
-                                optimizer.vertex(id)));
-            e->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
-                                optimizer.vertex(pKFi->mnId)));
-            e->setMeasurement(obs);
-            const float &invSigma2 = pKFi->mvInvLevelSigma2[kp.octave];
-            e->setInformation(Eigen::Matrix2d::Identity() * invSigma2);
-
-            g2o::RobustKernelHuber *rk = new g2o::RobustKernelHuber;
-            e->setRobustKernel(rk);
-            rk->setDelta(thHuberMono);
+            initEdge2V01(e, optimizer, id, pKFi->mnId, obs,
+                        pKFi->mvInvLevelSigma2[kp.octave], thHuberMono, true);
 
             Sophus::SE3f Trl = pKFi->GetRelativePoseTrl();
             e->mTrl = g2o::SE3Quat(Trl.unit_quaternion().cast<double>(),
@@ -2742,23 +2732,11 @@ void Optimizer::LocalInertialBA(KeyFrame *pKF, bool *pbStopFlag, Map *pMap,
           Eigen::Matrix<double, 2, 1> obs;
           obs << kpUn.pt.x, kpUn.pt.y;
 
-          EdgeMono *e = new EdgeMono(0);
-
-          e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
-                              optimizer.vertex(id)));
-          e->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
-                              optimizer.vertex(pKFi->mnId)));
-          e->setMeasurement(obs);
-
-          // Add here uncerteinty
-          const float unc2 = pKFi->mpCamera->uncertainty2(obs);
-
-          const float &invSigma2 = pKFi->mvInvLevelSigma2[kpUn.octave] / unc2;
-          e->setInformation(Eigen::Matrix2d::Identity() * invSigma2);
-
-          g2o::RobustKernelHuber *rk = new g2o::RobustKernelHuber;
-          e->setRobustKernel(rk);
-          rk->setDelta(thHuberMono);
+      EdgeMono *e = new EdgeMono(0);
+      initEdge2V01(e, optimizer, id, pKFi->mnId, obs,
+            pKFi->mvInvLevelSigma2[kpUn.octave] /
+              pKFi->mpCamera->uncertainty2(obs),
+            thHuberMono, true);
 
           optimizer.addEdge(e);
           vpEdgesMono.push_back(e);
@@ -2775,23 +2753,11 @@ void Optimizer::LocalInertialBA(KeyFrame *pKF, bool *pbStopFlag, Map *pMap,
           Eigen::Matrix<double, 3, 1> obs;
           obs << kpUn.pt.x, kpUn.pt.y, kp_ur;
 
-          EdgeStereo *e = new EdgeStereo(0);
-
-          e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
-                              optimizer.vertex(id)));
-          e->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
-                              optimizer.vertex(pKFi->mnId)));
-          e->setMeasurement(obs);
-
-          // Add here uncerteinty
-          const float unc2 = pKFi->mpCamera->uncertainty2(obs.head(2));
-
-          const float &invSigma2 = pKFi->mvInvLevelSigma2[kpUn.octave] / unc2;
-          e->setInformation(Eigen::Matrix3d::Identity() * invSigma2);
-
-          g2o::RobustKernelHuber *rk = new g2o::RobustKernelHuber;
-          e->setRobustKernel(rk);
-          rk->setDelta(thHuberStereo);
+      EdgeStereo *e = new EdgeStereo(0);
+      initEdge3V01(e, optimizer, id, pKFi->mnId, obs,
+            pKFi->mvInvLevelSigma2[kpUn.octave] /
+              pKFi->mpCamera->uncertainty2(obs.head(2)),
+            thHuberStereo, true);
 
           optimizer.addEdge(e);
           vpEdgesStereo.push_back(e);
@@ -2811,23 +2777,11 @@ void Optimizer::LocalInertialBA(KeyFrame *pKF, bool *pbStopFlag, Map *pMap,
             cv::KeyPoint kp = pKFi->mvKeysRight[rightIndex];
             obs << kp.pt.x, kp.pt.y;
 
-            EdgeMono *e = new EdgeMono(1);
-
-            e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
-                                optimizer.vertex(id)));
-            e->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
-                                optimizer.vertex(pKFi->mnId)));
-            e->setMeasurement(obs);
-
-            // Add here uncerteinty
-            const float unc2 = pKFi->mpCamera->uncertainty2(obs);
-
-            const float &invSigma2 = pKFi->mvInvLevelSigma2[kpUn.octave] / unc2;
-            e->setInformation(Eigen::Matrix2d::Identity() * invSigma2);
-
-            g2o::RobustKernelHuber *rk = new g2o::RobustKernelHuber;
-            e->setRobustKernel(rk);
-            rk->setDelta(thHuberMono);
+      EdgeMono *e = new EdgeMono(1);
+      initEdge2V01(e, optimizer, id, pKFi->mnId, obs,
+            pKFi->mvInvLevelSigma2[kpUn.octave] /
+              pKFi->mpCamera->uncertainty2(obs),
+            thHuberMono, true);
 
             optimizer.addEdge(e);
             vpEdgesMono.push_back(e);
@@ -3566,9 +3520,7 @@ void Optimizer::InertialOptimization(Map *pMap, Eigen::Matrix3d &Rwg,
       ei->setVertex(5, dynamic_cast<g2o::OptimizableGraph::Vertex *>(VV2));
       ei->setVertex(6, dynamic_cast<g2o::OptimizableGraph::Vertex *>(VGDir));
       ei->setVertex(7, dynamic_cast<g2o::OptimizableGraph::Vertex *>(VS));
-      g2o::RobustKernelHuber *rk = new g2o::RobustKernelHuber;
-      ei->setRobustKernel(rk);
-      rk->setDelta(1.f);
+  setHuberIfNeeded(ei, true, 1.f);
       optimizer.addEdge(ei);
     }
   }
@@ -3627,13 +3579,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame *pMainKF,
 
     pKFi->mnBALocalForMerge = pMainKF->mnId;
 
-    g2o::VertexSE3Expmap *vSE3 = new g2o::VertexSE3Expmap();
-    Sophus::SE3<float> Tcw = pKFi->GetPose();
-    vSE3->setEstimate(g2o::SE3Quat(Tcw.unit_quaternion().cast<double>(),
-                                   Tcw.translation().cast<double>()));
-    vSE3->setId(pKFi->mnId);
-    vSE3->setFixed(true);
-    optimizer.addVertex(vSE3);
+    addVertexFromKF(optimizer, pKFi, false, true, true);
     if (pKFi->mnId > maxKFid)
       maxKFid = pKFi->mnId;
 
@@ -3661,12 +3607,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame *pMainKF,
 
     pKFi->mnBALocalForMerge = pMainKF->mnId;
 
-    g2o::VertexSE3Expmap *vSE3 = new g2o::VertexSE3Expmap();
-    Sophus::SE3<float> Tcw = pKFi->GetPose();
-    vSE3->setEstimate(g2o::SE3Quat(Tcw.unit_quaternion().cast<double>(),
-                                   Tcw.translation().cast<double>()));
-    vSE3->setId(pKFi->mnId);
-    optimizer.addVertex(vSE3);
+    addVertexFromKF(optimizer, pKFi, false, true, false);
     if (pKFi->mnId > maxKFid)
       maxKFid = pKFi->mnId;
 
@@ -3749,19 +3690,9 @@ void Optimizer::LocalBundleAdjustment(KeyFrame *pMainKF,
         Eigen::Matrix<double, 2, 1> obs;
         obs << kpUn.pt.x, kpUn.pt.y;
 
-        ORB_SLAM3::EdgeSE3ProjectXYZ *e = new ORB_SLAM3::EdgeSE3ProjectXYZ();
-
-        e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
-                            optimizer.vertex(id)));
-        e->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
-                            optimizer.vertex(pKF->mnId)));
-        e->setMeasurement(obs);
-        const float &invSigma2 = pKF->mvInvLevelSigma2[kpUn.octave];
-        e->setInformation(Eigen::Matrix2d::Identity() * invSigma2);
-
-        g2o::RobustKernelHuber *rk = new g2o::RobustKernelHuber;
-        e->setRobustKernel(rk);
-        rk->setDelta(thHuber2D);
+  ORB_SLAM3::EdgeSE3ProjectXYZ *e = new ORB_SLAM3::EdgeSE3ProjectXYZ();
+  initEdge2V01(e, optimizer, id, pKF->mnId, obs,
+              pKF->mvInvLevelSigma2[kpUn.octave], thHuber2D, true);
 
         e->pCamera = pKF->mpCamera;
 
@@ -3779,20 +3710,9 @@ void Optimizer::LocalBundleAdjustment(KeyFrame *pMainKF,
         const float kp_ur = pKF->mvuRight[get<0>(mit->second)];
         obs << kpUn.pt.x, kpUn.pt.y, kp_ur;
 
-        g2o::EdgeStereoSE3ProjectXYZ *e = new g2o::EdgeStereoSE3ProjectXYZ();
-
-        e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
-                            optimizer.vertex(id)));
-        e->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
-                            optimizer.vertex(pKF->mnId)));
-        e->setMeasurement(obs);
-        const float &invSigma2 = pKF->mvInvLevelSigma2[kpUn.octave];
-        Eigen::Matrix3d Info = Eigen::Matrix3d::Identity() * invSigma2;
-        e->setInformation(Info);
-
-        g2o::RobustKernelHuber *rk = new g2o::RobustKernelHuber;
-        e->setRobustKernel(rk);
-        rk->setDelta(thHuber3D);
+  g2o::EdgeStereoSE3ProjectXYZ *e = new g2o::EdgeStereoSE3ProjectXYZ();
+  initEdge3V01(e, optimizer, id, pKF->mnId, obs,
+              pKF->mvInvLevelSigma2[kpUn.octave], thHuber3D, true);
 
         e->fx = pKF->fx;
         e->fy = pKF->fy;
@@ -4403,17 +4323,9 @@ void Optimizer::MergeInertialBA(KeyFrame *pCurrKF, KeyFrame *pMergeKF,
           obs << kpUn.pt.x, kpUn.pt.y;
 
           EdgeMono *e = new EdgeMono();
-          e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
-                              optimizer.vertex(id)));
-          e->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
-                              optimizer.vertex(pKFi->mnId)));
-          e->setMeasurement(obs);
-          const float &invSigma2 = pKFi->mvInvLevelSigma2[kpUn.octave];
-          e->setInformation(Eigen::Matrix2d::Identity() * invSigma2);
-
-          g2o::RobustKernelHuber *rk = new g2o::RobustKernelHuber;
-          e->setRobustKernel(rk);
-          rk->setDelta(thHuberMono);
+          initEdge2V01(e, optimizer, id, pKFi->mnId, obs,
+                      pKFi->mvInvLevelSigma2[kpUn.octave], thHuberMono,
+                      true);
           optimizer.addEdge(e);
           vpEdgesMono.push_back(e);
           vpEdgeKFMono.push_back(pKFi);
@@ -4425,19 +4337,9 @@ void Optimizer::MergeInertialBA(KeyFrame *pCurrKF, KeyFrame *pMergeKF,
           obs << kpUn.pt.x, kpUn.pt.y, kp_ur;
 
           EdgeStereo *e = new EdgeStereo();
-
-          e->setVertex(0, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
-                              optimizer.vertex(id)));
-          e->setVertex(1, dynamic_cast<g2o::OptimizableGraph::Vertex *>(
-                              optimizer.vertex(pKFi->mnId)));
-          e->setMeasurement(obs);
-          const float &invSigma2 = pKFi->mvInvLevelSigma2[kpUn.octave];
-          e->setInformation(Eigen::Matrix3d::Identity() * invSigma2);
-
-          g2o::RobustKernelHuber *rk = new g2o::RobustKernelHuber;
-          e->setRobustKernel(rk);
-          rk->setDelta(thHuberStereo);
-
+          initEdge3V01(e, optimizer, id, pKFi->mnId, obs,
+                      pKFi->mvInvLevelSigma2[kpUn.octave], thHuberStereo,
+                      true);
           optimizer.addEdge(e);
           vpEdgesStereo.push_back(e);
           vpEdgeKFStereo.push_back(pKFi);
@@ -4643,20 +4545,12 @@ int Optimizer::PoseInertialOptimizationLastKeyFrame(Frame *pFrame,
           Eigen::Matrix<double, 2, 1> obs;
           obs << kpUn.pt.x, kpUn.pt.y;
 
-          EdgeMonoOnlyPose *e = new EdgeMonoOnlyPose(pMP->GetWorldPos(), 0);
+      EdgeMonoOnlyPose *e = new EdgeMonoOnlyPose(pMP->GetWorldPos(), 0);
 
-          e->setVertex(0, VP);
-          e->setMeasurement(obs);
-
-          // Add here uncerteinty
-          const float unc2 = pFrame->mpCamera->uncertainty2(obs);
-
-          const float invSigma2 = pFrame->mvInvLevelSigma2[kpUn.octave] / unc2;
-          e->setInformation(Eigen::Matrix2d::Identity() * invSigma2);
-
-          g2o::RobustKernelHuber *rk = new g2o::RobustKernelHuber;
-          e->setRobustKernel(rk);
-          rk->setDelta(thHuberMono);
+      initEdge2V0_ptr(e, VP, obs,
+             pFrame->mvInvLevelSigma2[kpUn.octave] /
+               pFrame->mpCamera->uncertainty2(obs),
+             thHuberMono, true);
 
           optimizer.addEdge(e);
 
@@ -4673,20 +4567,12 @@ int Optimizer::PoseInertialOptimizationLastKeyFrame(Frame *pFrame,
           Eigen::Matrix<double, 3, 1> obs;
           obs << kpUn.pt.x, kpUn.pt.y, kp_ur;
 
-          EdgeStereoOnlyPose *e = new EdgeStereoOnlyPose(pMP->GetWorldPos());
+      EdgeStereoOnlyPose *e = new EdgeStereoOnlyPose(pMP->GetWorldPos());
 
-          e->setVertex(0, VP);
-          e->setMeasurement(obs);
-
-          // Add here uncerteinty
-          const float unc2 = pFrame->mpCamera->uncertainty2(obs.head(2));
-
-          const float &invSigma2 = pFrame->mvInvLevelSigma2[kpUn.octave] / unc2;
-          e->setInformation(Eigen::Matrix3d::Identity() * invSigma2);
-
-          g2o::RobustKernelHuber *rk = new g2o::RobustKernelHuber;
-          e->setRobustKernel(rk);
-          rk->setDelta(thHuberStereo);
+      initEdge3V0_ptr(e, VP, obs,
+             pFrame->mvInvLevelSigma2[kpUn.octave] /
+               pFrame->mpCamera->uncertainty2(obs.head(2)),
+             thHuberStereo, true);
 
           optimizer.addEdge(e);
 
@@ -4703,20 +4589,12 @@ int Optimizer::PoseInertialOptimizationLastKeyFrame(Frame *pFrame,
           Eigen::Matrix<double, 2, 1> obs;
           obs << kpUn.pt.x, kpUn.pt.y;
 
-          EdgeMonoOnlyPose *e = new EdgeMonoOnlyPose(pMP->GetWorldPos(), 1);
+      EdgeMonoOnlyPose *e = new EdgeMonoOnlyPose(pMP->GetWorldPos(), 1);
 
-          e->setVertex(0, VP);
-          e->setMeasurement(obs);
-
-          // Add here uncerteinty
-          const float unc2 = pFrame->mpCamera->uncertainty2(obs);
-
-          const float invSigma2 = pFrame->mvInvLevelSigma2[kpUn.octave] / unc2;
-          e->setInformation(Eigen::Matrix2d::Identity() * invSigma2);
-
-          g2o::RobustKernelHuber *rk = new g2o::RobustKernelHuber;
-          e->setRobustKernel(rk);
-          rk->setDelta(thHuberMono);
+      initEdge2V0_ptr(e, VP, obs,
+             pFrame->mvInvLevelSigma2[kpUn.octave] /
+               pFrame->mpCamera->uncertainty2(obs),
+             thHuberMono, true);
 
           optimizer.addEdge(e);
 
@@ -5011,20 +4889,12 @@ int Optimizer::PoseInertialOptimizationLastFrame(Frame *pFrame, bool bRecInit) {
           Eigen::Matrix<double, 2, 1> obs;
           obs << kpUn.pt.x, kpUn.pt.y;
 
-          EdgeMonoOnlyPose *e = new EdgeMonoOnlyPose(pMP->GetWorldPos(), 0);
+      EdgeMonoOnlyPose *e = new EdgeMonoOnlyPose(pMP->GetWorldPos(), 0);
 
-          e->setVertex(0, VP);
-          e->setMeasurement(obs);
-
-          // Add here uncerteinty
-          const float unc2 = pFrame->mpCamera->uncertainty2(obs);
-
-          const float invSigma2 = pFrame->mvInvLevelSigma2[kpUn.octave] / unc2;
-          e->setInformation(Eigen::Matrix2d::Identity() * invSigma2);
-
-          g2o::RobustKernelHuber *rk = new g2o::RobustKernelHuber;
-          e->setRobustKernel(rk);
-          rk->setDelta(thHuberMono);
+      initEdge2V0_ptr(e, VP, obs,
+             pFrame->mvInvLevelSigma2[kpUn.octave] /
+               pFrame->mpCamera->uncertainty2(obs),
+             thHuberMono, true);
 
           optimizer.addEdge(e);
 
@@ -5041,20 +4911,12 @@ int Optimizer::PoseInertialOptimizationLastFrame(Frame *pFrame, bool bRecInit) {
           Eigen::Matrix<double, 3, 1> obs;
           obs << kpUn.pt.x, kpUn.pt.y, kp_ur;
 
-          EdgeStereoOnlyPose *e = new EdgeStereoOnlyPose(pMP->GetWorldPos());
+      EdgeStereoOnlyPose *e = new EdgeStereoOnlyPose(pMP->GetWorldPos());
 
-          e->setVertex(0, VP);
-          e->setMeasurement(obs);
-
-          // Add here uncerteinty
-          const float unc2 = pFrame->mpCamera->uncertainty2(obs.head(2));
-
-          const float &invSigma2 = pFrame->mvInvLevelSigma2[kpUn.octave] / unc2;
-          e->setInformation(Eigen::Matrix3d::Identity() * invSigma2);
-
-          g2o::RobustKernelHuber *rk = new g2o::RobustKernelHuber;
-          e->setRobustKernel(rk);
-          rk->setDelta(thHuberStereo);
+      initEdge3V0_ptr(e, VP, obs,
+             pFrame->mvInvLevelSigma2[kpUn.octave] /
+               pFrame->mpCamera->uncertainty2(obs.head(2)),
+             thHuberStereo, true);
 
           optimizer.addEdge(e);
 
@@ -5071,20 +4933,12 @@ int Optimizer::PoseInertialOptimizationLastFrame(Frame *pFrame, bool bRecInit) {
           Eigen::Matrix<double, 2, 1> obs;
           obs << kpUn.pt.x, kpUn.pt.y;
 
-          EdgeMonoOnlyPose *e = new EdgeMonoOnlyPose(pMP->GetWorldPos(), 1);
+      EdgeMonoOnlyPose *e = new EdgeMonoOnlyPose(pMP->GetWorldPos(), 1);
 
-          e->setVertex(0, VP);
-          e->setMeasurement(obs);
-
-          // Add here uncerteinty
-          const float unc2 = pFrame->mpCamera->uncertainty2(obs);
-
-          const float invSigma2 = pFrame->mvInvLevelSigma2[kpUn.octave] / unc2;
-          e->setInformation(Eigen::Matrix2d::Identity() * invSigma2);
-
-          g2o::RobustKernelHuber *rk = new g2o::RobustKernelHuber;
-          e->setRobustKernel(rk);
-          rk->setDelta(thHuberMono);
+      initEdge2V0_ptr(e, VP, obs,
+             pFrame->mvInvLevelSigma2[kpUn.octave] /
+               pFrame->mpCamera->uncertainty2(obs),
+             thHuberMono, true);
 
           optimizer.addEdge(e);
 
