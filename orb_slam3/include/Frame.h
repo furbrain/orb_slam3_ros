@@ -89,6 +89,9 @@ public:
     // Set IMU pose and velocity (implicitly changes camera pose)
     void SetImuPoseVelocity(const Eigen::Matrix3f &Rwb, const Eigen::Vector3f &twb, const Eigen::Vector3f &Vwb);
 
+    // Set camera pose from the IMU pose estimate
+    void SetPoseFromEstimate();
+
     Eigen::Matrix<float,3,1> GetImuPosition() const;
     Eigen::Matrix<float,3,3> GetImuRotation();
     Sophus::SE3<float> GetImuPose();
@@ -96,6 +99,9 @@ public:
     // IMU pose estimate (quaternion) getter/setter
     void SetImuPoseEstimate(const Eigen::Quaternionf &q);
     Eigen::Quaternionf GetImuPoseEstimate() const;
+
+    void SetImuPoseNoise(float noise);
+    float GetImuPoseNoise() const;
 
     Sophus::SE3f GetRelativePoseTrl();
     Sophus::SE3f GetRelativePoseTlr();
@@ -194,6 +200,7 @@ private:
 
     // IMU pose estimate (quaternion)
     Eigen::Quaternionf mImuPoseEstimate;
+    float mfImuPoseNoise;
 
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW

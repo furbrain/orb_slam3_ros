@@ -56,6 +56,25 @@ void serializeSophusSE3(Archive &ar, Sophus::SE3f &T, const unsigned int version
     }
 }
 
+template <class Archive>
+void serializeQuat(Archive &ar, Eigen::Quaternionf &q, const unsigned int version)
+{
+    Eigen::Vector4f quat;
+
+    if (Archive::is_saving::value)
+    {
+        quat << q.w(), q.x(), q.y(), q.z();
+    }
+
+    ar & boost::serialization::make_array(quat.data(), quat.size());
+
+    if (Archive::is_loading::value)
+    {
+        q = Eigen::Quaternionf(quat[0], quat[1], quat[2], quat[3]);
+    }
+}
+
+
 /*template <class Archive, size_t dim>
 void serializeDiagonalMatrix(Archive &ar, Eigen::DiagonalMatrix<float, dim> &D, const unsigned int version)
 {

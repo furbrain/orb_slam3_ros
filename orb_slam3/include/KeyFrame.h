@@ -192,6 +192,8 @@ class KeyFrame
         ar & boost::serialization::make_array(mVw.data(), mVw.size());
         ar & boost::serialization::make_array(mOwb.data(), mOwb.size());
         ar & mbHasVelocity;
+        serializeQuat<Archive>(ar, mImuPoseEstimate, version);
+        ar & mfImuPoseNoise;
     }
 
 public:
@@ -214,6 +216,8 @@ public:
     // IMU pose estimate (quaternion) getter/setter
     void SetImuPoseEstimate(const Eigen::Quaternionf &q);
     Eigen::Quaternionf GetImuPoseEstimate();
+    void SetImuPoseNoise(const float noise);
+    float GetImuPoseNoise();
     Eigen::Matrix3f GetRotation();
     Eigen::Vector3f GetTranslation();
     Eigen::Vector3f GetVelocity();
@@ -445,6 +449,7 @@ protected:
 
     // IMU pose estimate (quaternion)
     Eigen::Quaternionf mImuPoseEstimate;
+    float mfImuPoseNoise;
 
     //Transformation matrix between cameras in stereo fisheye
     Sophus::SE3<float> mTlr;
