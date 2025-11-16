@@ -19,6 +19,8 @@
 #include "G2oTypes.h"
 #include "ImuTypes.h"
 #include "Converter.h"
+#include "Thirdparty/g2o/g2o/core/factory.h"
+
 namespace ORB_SLAM3
 {
 
@@ -813,6 +815,29 @@ Eigen::Vector3d LogSO3(const Eigen::Matrix3d &R)
         return theta*w/s;
 }
 
+static inline Eigen::Vector3d LogSO3(const Eigen::Quaterniond& q)
+{
+    Eigen::Quaterniond qc = q;
+    qc.normalize();
+
+    double w = qc.w();
+    Eigen::Vector3d v = qc.vec();
+
+    // Clamp numerical issues
+    if (w > 1.0)  w = 1.0;
+    if (w < -1.0) w = -1.0;
+
+    double theta = 2.0 * std::acos(w);
+    double s = std::sqrt(1.0 - w*w);
+
+    if (s < 1e-8) {
+        // Small-angle approximation: q ≈ [1, v/2]
+        return 2.0 * v; 
+    }
+
+    return theta * (v / s);
+}
+
 Eigen::Matrix3d InverseRightJacobianSO3(const Eigen::Vector3d &v)
 {
     return InverseRightJacobianSO3(v[0],v[1],v[2]);
@@ -859,5 +884,46 @@ Eigen::Matrix3d Skew(const Eigen::Vector3d &w)
     W << 0.0, -w[2], w[1],w[2], 0.0, -w[0],-w[1],  w[0], 0.0;
     return W;
 }
+
+// Constructor
+EdgeSE3ExpMapOrientationPrior::EdgeSE3ExpMapOrientationPrior() {}
+
+// Compute the orientation residual
+void EdgeSE3ExpMapOrientationPrior::computeError() 
+{
+    const g2o::VertexSE3Expmap* v =
+        static_cast<const g2o::VertexSE3Expmap*>(_vertices[0]);
+
+    // Estimated orientation from the node
+    Eigen::Quaterniond q_est = v->estimate().rotation();
+    q_est.normalize();
+
+    // Measured orientation (Madgwick)
+    Eigen::Quaterniond q_meas = _measurement;
+    q_meas.normalize();
+
+    // Error quaternion: q_err = q_meas^{-1} * q_est
+    Eigen::Quaterniond q_err = q_meas.conjugate() * q_est;
+    q_err.normalize();
+
+    // Convert quaternion error → minimal 3-vector (axis-angle log)
+    // g2o helper: internal::toVectorMQ()
+    Eigen::Vector3d err = LogSO3(q_err);
+
+    _error = err;
+}
+
+bool EdgeSE3ExpMapOrientationPrior::read(std::istream& is) 
+{
+    // Optional: implement if loading from file. Most applications ignore this.
+    return true;
+}
+
+bool EdgeSE3ExpMapOrientationPrior::write(std::ostream& os) const 
+{
+    // Optional: implement for saving graph edges. Usually not required.
+    return true;
+}
+
 
 }

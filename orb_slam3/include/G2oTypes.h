@@ -22,6 +22,7 @@
 #include "Thirdparty/g2o/g2o/core/base_vertex.h"
 #include "Thirdparty/g2o/g2o/core/base_binary_edge.h"
 #include "Thirdparty/g2o/g2o/types/types_sba.h"
+#include "Thirdparty/g2o/g2o/types/types_six_dof_expmap.h"
 #include "Thirdparty/g2o/g2o/core/base_multi_edge.h"
 #include "Thirdparty/g2o/g2o/core/base_unary_edge.h"
 
@@ -840,6 +841,21 @@ public:
     Eigen::Matrix4d dTij;
     Eigen::Matrix3d dRij;
     Eigen::Vector3d dtij;
+};
+
+class EdgeSE3ExpMapOrientationPrior
+    : public g2o::BaseUnaryEdge<3, Eigen::Quaterniond, g2o::VertexSE3Expmap> {
+
+public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  EdgeSE3ExpMapOrientationPrior();
+
+  // Compute the 3D rotation error
+  void computeError() override;
+
+  // Standard g2o I/O (usually unused)
+  bool read(std::istream& is) override;
+  bool write(std::ostream& os) const override;
 };
 
 } //namespace ORB_SLAM2
