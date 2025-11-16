@@ -925,5 +925,29 @@ bool EdgeSE3ExpMapOrientationPrior::write(std::ostream& os) const
     return true;
 }
 
+// Constructor
+EdgeSE3ExpMapTranslationPrior::EdgeSE3ExpMapTranslationPrior() {}
+
+void EdgeSE3ExpMapTranslationPrior::computeError()
+{
+    const g2o::VertexSE3Expmap* v =
+        static_cast<const g2o::VertexSE3Expmap*>(_vertices[0]);
+
+    Eigen::Vector3d t_est = v->estimate().translation();
+    _error = t_est - _measurement;
+}
+
+// Jacobian wrt pose increment (6x1 perturbation: [w_x, w_y, w_z, v_x, v_y, v_z])
+// Only translation part affects residual, rotation does not.
+void EdgeSE3ExpMapTranslationPrior::linearizeOplus()
+{
+    _jacobianOplusXi.setZero();
+
+    // derivative of (t_est - t_meas) wrt translation increment = identity
+    _jacobianOplusXi.block<3,3>(0,3) = Eigen::Matrix3d::Identity();
+
+    // derivative wrt rotation increment = zero (rotation unconstrained)
+}
+
 
 }

@@ -858,6 +858,22 @@ public:
   bool write(std::ostream& os) const override;
 };
 
+// Constrains only translation of a VertexSE3ExpMap.
+// Rotation is completely free.
+class EdgeSE3ExpMapTranslationPrior
+    : public g2o::BaseUnaryEdge<3, Eigen::Vector3d, g2o::VertexSE3Expmap> {
+
+public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  EdgeSE3ExpMapTranslationPrior();
+
+  void computeError() override;
+  void linearizeOplus() override;
+
+  bool read(std::istream&) override { return true; }
+  bool write(std::ostream&) const override { return true; }
+};
+
 } //namespace ORB_SLAM2
 
 #endif // G2OTYPES_H
