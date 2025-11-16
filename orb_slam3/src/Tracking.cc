@@ -2331,15 +2331,17 @@ void Tracking::StereoInitialization() {
     }
 
     // Set Frame pose to the origin (In case of inertial SLAM to imu)
-    if (mSensor == System::IMU_STEREO || mSensor == System::IMU_RGBD) {
+    if (mUseImuTrajectory) {
       Eigen::Matrix3f Rwb0 = mCurrentFrame.mImuCalib.mTcb.rotationMatrix();
       Eigen::Vector3f twb0 = mCurrentFrame.mImuCalib.mTcb.translation();
       Eigen::Vector3f Vwb0;
       Vwb0.setZero();
       mCurrentFrame.SetImuPoseVelocity(Rwb0, twb0, Vwb0); 
-    } else
+    } else if (mUseImuPose) {
+      mCurrentFrame.SetPoseFromEstimate();
+    } else {
       mCurrentFrame.SetPose(Sophus::SE3f());
-
+    }
     // Create KeyFrame
     KeyFrame *pKFini =
         new KeyFrame(mCurrentFrame, mpAtlas->GetCurrentMap(), mpKeyFrameDB);

@@ -39,6 +39,7 @@ private:
 
 int main(int argc, char **argv)
 {
+    sleep(2); // wait for madgwick filter to initialize
     auto node = init(argc, argv, "RGBD_Inertial", ORB_SLAM3::System::IMU_RGBD);
     if (node==NULL) return 1;
     std::string node_name = node->get_name();
