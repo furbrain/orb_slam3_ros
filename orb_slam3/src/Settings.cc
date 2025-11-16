@@ -458,7 +458,7 @@ void Settings::readIMU(cv::FileStorage &fSettings) {
     noisePose_ = readParameter<float>(fSettings, "IMU.NoisePose", found);
   } else {
     useImuPose_ = false;
-    noisePose_ = 0.0f;
+    noisePose_ = -1.0f;
   }
 
   // Read optional flag to use IMU trajectory information (default: true)

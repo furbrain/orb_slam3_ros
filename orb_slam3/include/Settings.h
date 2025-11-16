@@ -100,6 +100,7 @@ public:
   bool insertKFsWhenLost() { return insertKFsWhenLost_; }
   bool useImuTrajectory() { return useImuTrajectory_; }
   bool useImuPose() { return useImuPose_; }
+  float noisePose() { return noisePose_; }
 
   float depthMapFactor() { return depthMapFactor_; }
 

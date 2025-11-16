@@ -659,6 +659,7 @@ void Tracking::newParameterLoader(Settings *settings) {
   float Ngw = settings->gyroWalk();
   float Naw = settings->accWalk();
   mUseImuPose = settings->useImuPose();
+  mImuPoseNoise = settings->noisePose();
   mUseImuTrajectory = settings->useImuTrajectory();
 
 
@@ -1311,6 +1312,15 @@ bool Tracking::ParseIMUParamFile(cv::FileStorage &fSettings) {
       mUseImuPose = static_cast<int>(fSettings["IMU.UseImuPose"]) != 0;
   }
 
+  if (mUseImuPose)
+    node = fSettings["IMU.NoisePose"];
+  if (!node.empty() && node.isReal()) {
+    mImuPoseNoise = node.real();
+  } else {
+    VerboseStream(Verbose::VERBOSITY_QUIET) << "*Using IMUPose and IMU.NoisePose parameter doesn't exist or is not a real number*" << std::endl;
+    b_miss_params = true;
+  }
+
   node = fSettings["IMU.UseImuTrajectory"];
   mUseImuTrajectory = true;
   if (!node.empty()) {
@@ -1527,6 +1537,7 @@ void Tracking::SetImuPoseEstimate() {
     return;
   }
   mCurrentFrame.SetImuPoseEstimate(mlQueueImuData.back().pose);
+  mCurrentFrame.SetImuPoseNoise(mImuPoseNoise);
 }
 
 void Tracking::PreintegrateIMU() {

@@ -305,6 +305,7 @@ protected:
     bool mInsertKFsLost;
     bool mUseImuPose;
     bool mUseImuTrajectory;
+    float mImuPoseNoise;
 
     //New KeyFrame rules (according to fps)
     int mMinFrames;
