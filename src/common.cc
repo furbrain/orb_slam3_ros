@@ -8,6 +8,7 @@
 #include "System.h"
 #include <orb_slam3/msg/atlas.hpp> // This file is created automatically, see here http://wiki.ros.org/ROS/Tutorials/CreatingMsgAndSrv#Creating_a_srv
 #include <orb_slam3/msg/num_points.hpp>
+#include <orb_slam3/msg/state.hpp>
 
 // Variables for ORB-SLAM3
 ORB_SLAM3::System *pSLAM;
@@ -24,6 +25,7 @@ rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr
     tracked_keypoints_pub, all_mappoints_pub;
 rclcpp::Publisher<orb_slam3::msg::Atlas>::SharedPtr atlas_pub;
 rclcpp::Publisher<orb_slam3::msg::NumPoints>::SharedPtr num_points_pub;
+rclcpp::Publisher<orb_slam3::msg::State>::SharedPtr state_pub;
 image_transport::Publisher tracking_img_pub, kf_pub;
 std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster;
 
@@ -93,6 +95,11 @@ void setup_services(rclcpp::Node::SharedPtr node, std::string node_name) {
                                                     &save_traj_srv);
 }
 
+void setup_clients(rclcpp::Node::SharedPtr node, std::string node_name) {
+  // Currently no clients are needed
+
+}
+
 void setup_publishers(rclcpp::Node::SharedPtr node, std::string node_name) {
   static image_transport::ImageTransport image_transport(node);
 
@@ -128,6 +135,9 @@ void setup_publishers(rclcpp::Node::SharedPtr node, std::string node_name) {
   num_points_pub = node->create_publisher<orb_slam3::msg::NumPoints>(
       node_name + "/num_points", 1);
   tf_broadcaster = std::make_unique<tf2_ros::TransformBroadcaster>(*node);
+
+  state_pub = node->create_publisher<orb_slam3::msg::State>(
+      node_name + "/state", 1);
 }
 
 void publish_topics(rclcpp::Time msg_time, Eigen::Vector3f Wbb) {
@@ -142,7 +152,10 @@ void publish_topics(rclcpp::Time msg_time, Eigen::Vector3f Wbb) {
   publish_tf_transform(Twc, world_frame_id, cam_frame_id, msg_time);
 
   publish_tracking_img(pSLAM->GetCurrentFrame(), msg_time);
-  if (pSLAM->GetTrackingState() == ORB_SLAM3::Tracking::RECENTLY_LOST &&
+
+  auto state = pSLAM->GetTrackingState();
+  auto state_msg = orb_slam3::msg::State();
+  if (state == ORB_SLAM3::Tracking::RECENTLY_LOST &&
       !lost_images_path.empty()) {
     ORB_SLAM3::Verbose::PrintMess(
         "Saving lost image " + std::to_string(msg_time.nanoseconds()) + ".png",
@@ -151,6 +164,21 @@ void publish_topics(rclcpp::Time msg_time, Eigen::Vector3f Wbb) {
         lost_images_path + std::to_string(msg_time.nanoseconds()) + ".png";
     cv::imwrite(img_name, pSLAM->GetCurrentFrame());
   }
+  switch (state) {
+  case ORB_SLAM3::Tracking::OK:
+    state_msg.state = orb_slam3::msg::State::OK;
+    break;  
+  case ORB_SLAM3::Tracking::RECENTLY_LOST:
+    state_msg.state = orb_slam3::msg::State::RECENTLY_LOST;
+    break;
+  case ORB_SLAM3::Tracking::LOST:
+    state_msg.state = orb_slam3::msg::State::LOST;
+    break;
+  default:
+    state_msg.state = orb_slam3::msg::State::OTHER;
+    break;
+  }
+  state_pub->publish(state_msg);
 
   publish_keypoints(pSLAM->GetTrackedMapPoints(), pSLAM->GetTrackedKeyPoints(),
                     msg_time);

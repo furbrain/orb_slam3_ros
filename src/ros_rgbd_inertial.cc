@@ -156,6 +156,8 @@ void ImageGrabber::SyncWithImu()
             mpImuGb->mBufMutex.unlock();
 
             // ORB-SLAM3 runs in TrackRGBD()
+            if (vImuMeas.empty())
+                continue;
             Sophus::SE3f Tcw = pSLAM->TrackRGBD(im, depth, tIm.seconds(), vImuMeas);
             
             publish_topics(msg_time, Wbb);

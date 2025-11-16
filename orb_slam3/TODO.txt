@@ -1,0 +1,6 @@
+Make beeping noise when lost (and sad noise when really lost)
+Set a bundle adjustment to run after 15 seconds or something to tidy map
+Work on hardware
+Get recording up and running - saving keyframes and maps
+Post-processing - need code which loads a bunch of keyframes and maps runs a full bundle on them...
+Integrate with OpenMVS
