@@ -150,23 +150,57 @@ inline void initEdge3V0_ptr(EdgeT *e, g2o::OptimizableGraph::Vertex *v0,
                    delta);
 }
 
-void addVertexFromKF(g2o::SparseOptimizer &optimizer, KeyFrame *pKF, bool fixed_from_kf, bool id_from_kf = true, bool fixed = false) {
+template<typename T>
+inline EdgeSE3ExpMapOrientationPrior* addOrientationConstraintToVertex(T *pFrame, g2o::VertexSE3Expmap *vSE3) {
+  double noise = pFrame->GetImuPoseNoise();
+  if (noise >= 0.0) {
+    EdgeSE3ExpMapOrientationPrior *edge = new EdgeSE3ExpMapOrientationPrior();
+    Sophus::SE3f Tcw = pFrame->GetPoseFromEstimate();
+    edge->setMeasurement(Tcw.unit_quaternion().cast<double>());
+    edge->setInformation(Eigen::Matrix3d::Identity() * (1.0 / (noise * noise)));
+    edge->setVertex(0, vSE3);
+    setHuberIfNeeded(edge, true, 4.0);
+    return edge;
+  }
+  return nullptr;
+}
+
+inline EdgeSE3ExpMapTranslationPrior * addTranslationConstraintToVertex(g2o::VertexSE3Expmap *vSE3, const Eigen::Vector3d &t,
+                                             double noise = 0.01) {
+  EdgeSE3ExpMapTranslationPrior *edgeT = new EdgeSE3ExpMapTranslationPrior();
+  edgeT->setMeasurement(t);
+  edgeT->setInformation(Eigen::Matrix3d::Identity() * (1.0 / (noise * noise)));
+  edgeT->setVertex(0, vSE3);
+  setHuberIfNeeded(edgeT, true, 4.0);
+  return edgeT;
+}
+
+void addVertexFromKF(g2o::SparseOptimizer &optimizer, KeyFrame *pKF, bool fixed_from_kf, bool fixed = false) {
   g2o::VertexSE3Expmap *vSE3 = new g2o::VertexSE3Expmap();
   Sophus::SE3<float> Tcw = pKF->GetPose();
   vSE3->setEstimate(g2o::SE3Quat(Tcw.unit_quaternion().cast<double>(),
                                  Tcw.translation().cast<double>()));
-  if (id_from_kf) {
-    vSE3->setId(pKF->mnId);
-  } else {
-    vSE3->setId(0); 
-  }
+  vSE3->setId(pKF->mnId);
   if (fixed_from_kf) {
     vSE3->setFixed(pKF->mnId == pKF->GetMap()->GetInitKFid());
   } else {
     vSE3->setFixed(fixed);
   }
   optimizer.addVertex(vSE3);
+  auto orientation_edge = addOrientationConstraintToVertex(pKF, vSE3);
+  if (orientation_edge) {
+    optimizer.addEdge(orientation_edge);
+    if (fixed_from_kf && vSE3->fixed()) {
+      // This is the first "fixed" keyframe, so we set the IMU orientation prior as non fixed
+      // and a strong prior to the translation to anchor it.
+      vSE3->setFixed(false);
+      auto anchor_edge = addTranslationConstraintToVertex(vSE3, pKF->GetPose().translation().cast<double>(), 0.01);
+      optimizer.addEdge(anchor_edge);
+    }
+  }
 }
+
+
 } // anonymous namespace
 
 void Optimizer::GlobalBundleAdjustemnt(Map *pMap, int nIterations,
@@ -870,7 +904,10 @@ int Optimizer::PoseOptimization(Frame *pFrame) {
   vSE3->setId(0);
   vSE3->setFixed(false);
   optimizer.addVertex(vSE3);
-
+  auto orientation_edge = addOrientationConstraintToVertex(pFrame, vSE3);
+  if (orientation_edge) {
+    optimizer.addEdge(orientation_edge);
+  }
   // Set MapPoint vertices
   const int N = pFrame->N;
 
@@ -1233,7 +1270,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame *pKF, bool *pbStopFlag,
                                   lend = lFixedCameras.end();
        lit != lend; lit++) {
     KeyFrame *pKFi = *lit;
-    addVertexFromKF(optimizer, pKFi, false, true, true);
+    addVertexFromKF(optimizer, pKFi, false, true);
     if (pKFi->mnId > maxKFid)
       maxKFid = pKFi->mnId;
     // DEBUG LBA
@@ -3579,7 +3616,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame *pMainKF,
 
     pKFi->mnBALocalForMerge = pMainKF->mnId;
 
-    addVertexFromKF(optimizer, pKFi, false, true, true);
+    addVertexFromKF(optimizer, pKFi, false, true);
     if (pKFi->mnId > maxKFid)
       maxKFid = pKFi->mnId;
 
@@ -3607,7 +3644,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame *pMainKF,
 
     pKFi->mnBALocalForMerge = pMainKF->mnId;
 
-    addVertexFromKF(optimizer, pKFi, false, true, false);
+    addVertexFromKF(optimizer, pKFi, false, false);
     if (pKFi->mnId > maxKFid)
       maxKFid = pKFi->mnId;
 
