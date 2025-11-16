@@ -102,6 +102,8 @@ public:
 
     void SetImuPoseNoise(float noise);
     float GetImuPoseNoise() const;
+    Sophus::SE3f GetPoseFromEstimate() const;
+
 
     Sophus::SE3f GetRelativePoseTrl();
     Sophus::SE3f GetRelativePoseTlr();

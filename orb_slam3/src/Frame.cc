@@ -472,14 +472,20 @@ void Frame::SetImuPoseVelocity(const Eigen::Matrix3f &Rwb, const Eigen::Vector3f
 
 void Frame::SetPoseFromEstimate()
 {
-    Sophus::SO3f rwb(mImuPoseEstimate);
-    Eigen::Vector3f tbw;
-    tbw.setZero();
-    mTcw = mImuCalib.mTcb * Sophus::SE3f(rwb.inverse(), tbw);
-
+    
+    mTcw = GetPoseFromEstimate();
     UpdatePoseMatrices();
     mbIsSet = true;
     mbHasPose = true;
+}
+
+Sophus::SE3f Frame::GetPoseFromEstimate() const
+{
+    Sophus::SO3f rwb(mImuPoseEstimate);
+    Eigen::Vector3f tbw;
+    tbw.setZero();
+    Sophus::SE3f Tcw = mImuCalib.mTcb * Sophus::SE3f(rwb.inverse(), tbw);
+    return Tcw;
 }
 
 void Frame::SetImuPoseEstimate(const Eigen::Quaternionf &q)

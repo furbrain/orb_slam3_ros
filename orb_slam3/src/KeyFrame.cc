@@ -186,7 +186,14 @@ float KeyFrame::GetImuPoseNoise()
     return mfImuPoseNoise;
 }
 
-
+Sophus::SE3f KeyFrame::GetPoseFromEstimate() const
+{
+    Sophus::SO3f rwb(mImuPoseEstimate);
+    Eigen::Vector3f tbw;
+    tbw.setZero();
+    Sophus::SE3f Tcw = mImuCalib.mTcb * Sophus::SE3f(rwb.inverse(), tbw);
+    return Tcw;
+}
 
 Eigen::Matrix3f KeyFrame::GetRotation(){
     unique_lock<mutex> lock(mMutexPose);

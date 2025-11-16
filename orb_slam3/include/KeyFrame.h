@@ -218,6 +218,8 @@ public:
     Eigen::Quaternionf GetImuPoseEstimate();
     void SetImuPoseNoise(const float noise);
     float GetImuPoseNoise();
+    Sophus::SE3f GetPoseFromEstimate() const;
+
     Eigen::Matrix3f GetRotation();
     Eigen::Vector3f GetTranslation();
     Eigen::Vector3f GetVelocity();
