@@ -1532,7 +1532,7 @@ void Tracking::GrabImuData(const IMU::Point &imuMeasurement) {
 
 void Tracking::SetImuPoseEstimate() {
   if (mlQueueImuData.size() == 0) {
-    Verbose::PrintMess("Not IMU data in mlQueueImuData!!",
+    Verbose::PrintMess("Not IMU orientation data in mlQueueImuData!!",
                        Verbose::VERBOSITY_NORMAL);
     return;
   }
