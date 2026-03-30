@@ -166,11 +166,11 @@ void ImageGrabber::SyncWithImu()
                 publish_atlas(pSLAM->GetAtlas(), msg_time);
             }
 
-            //if (pSLAM->GetLastFrameIsKF()) 
-            //{
-            //    publish_atlas(pSLAM->GetAtlas(), msg_time);
-            //    publish_kf(im, msg_time);
-            //}
+            if (pSLAM->GetLastFrameIsKF()) 
+            {
+               publish_atlas(pSLAM->GetAtlas(), msg_time);
+               publish_kf(im, msg_time);
+            }
         }
 
         std::chrono::milliseconds tSleep(1);

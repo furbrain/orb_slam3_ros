@@ -385,7 +385,7 @@ void publish_atlas(ORB_SLAM3::Atlas *atlas, rclcpp::Time msg_time) {
       Eigen::Quaternionf q = Twb.unit_quaternion();
       Sophus::Vector3f tr = Twb.translation();
       kf_msg.id = pKF->mnId;
-      kf_msg.stamp = rclcpp::Time(pKF->mTimeStamp);
+      kf_msg.stamp = rclcpp::Time(int64(pKF->mTimeStamp * 1e9));
       kf_msg.pose.orientation.w = q.w();
       kf_msg.pose.orientation.x = q.x();
       kf_msg.pose.orientation.y = q.y();
