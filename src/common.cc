@@ -26,7 +26,7 @@ rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr
 rclcpp::Publisher<orb_slam3::msg::Atlas>::SharedPtr atlas_pub;
 rclcpp::Publisher<orb_slam3::msg::NumPoints>::SharedPtr num_points_pub;
 rclcpp::Publisher<orb_slam3::msg::State>::SharedPtr state_pub;
-image_transport::Publisher tracking_img_pub, kf_pub;
+image_transport::Publisher tracking_img_pub, kf_pub, kf_pub_right;
 std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster;
 
 //////////////////////////////////////////////////
@@ -122,6 +122,7 @@ void setup_publishers(rclcpp::Node::SharedPtr node, std::string node_name) {
       node_name + "/kf_markers", 1000);
 
   kf_pub = image_transport.advertise(node_name + "/keyframes", 1);
+  kf_pub_right = image_transport.advertise(node_name + "/keyframes_right", 1);
 
   atlas_pub =
       node->create_publisher<orb_slam3::msg::Atlas>(node_name + "/atlas", 3);
@@ -367,6 +368,48 @@ void publish_kf(cv::Mat image, rclcpp::Time msg_time) {
       cv_bridge::CvImage(header, "bgr8", image).toImageMsg();
   kf_pub.publish(rendered_image_msg);
 }
+
+void publish_kf_right(cv::Mat image, rclcpp::Time msg_time) {
+  std_msgs::msg::Header header;
+  header.stamp = msg_time;
+  header.frame_id = world_frame_id;
+  const sensor_msgs::msg::Image::SharedPtr rendered_image_msg =
+      cv_bridge::CvImage(header, "bgr8", image).toImageMsg();
+  kf_pub_right.publish(rendered_image_msg);
+}
+
+// void extract_keypoints(vector<orb_slam3::msg::Point3D> points, ORB_SLAM3::KeyFrame *pKF, bool left) {
+//   vector<cv::KeyPoint>* keys;
+//   orb_slam3::msg::KeyFrame kf_msg;
+//   if (left) {
+//     keys = &pKF->mvKeys;
+//   } else {
+//     keys = &pKF->mvKeysRight;
+//   }
+//   for (size_t i = 0; i < keys->size(); i++) {
+//     cv::KeyPoint kp = (*keys)[i];
+//     orb_slam3::msg::KeyPoint kp_msg;
+//     auto mp = pKF->GetMapPoint(i);
+//     if (mp) {
+//       kp_msg.point3d_id = mp->mnId;
+//       kp_msg.x = kp.pt.x;
+//       kp_msg.y = kp.pt.y;
+//       kf_msg.points.push_back(kp_msg);
+//       if (sPoints.insert(mp->mnId).second) // insert returns second part
+//                                             // true if actually inserted
+//       { // therefore we need to add this point to the main points list
+//         auto pos = mp->GetWorldPos();
+//         orb_slam3::msg::Point3D pt_msg;
+//         pt_msg.x = pos.x();
+//         pt_msg.y = pos.y();
+//         pt_msg.z = pos.z();
+//         pt_msg.id = mp->mnId;
+//         atlas_msg.points.push_back(pt_msg);
+//       }
+//     }
+//   }
+// }
+
 
 void publish_atlas(ORB_SLAM3::Atlas *atlas, rclcpp::Time msg_time) {
   std_msgs::msg::Header header;

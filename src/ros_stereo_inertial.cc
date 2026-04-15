@@ -88,22 +88,14 @@ cv::Mat ImageGrabber::GetImage(const sensor_msgs::msg::Image::ConstSharedPtr img
     cv_bridge::CvImageConstPtr cv_ptr;
     try
     {
-        cv_ptr = cv_bridge::toCvShare(img_msg, sensor_msgs::image_encodings::MONO8);
+        cv_ptr = cv_bridge::toCvShare(img_msg);
     }
     catch (cv_bridge::Exception& e)
     {
         RCLCPP_ERROR(rclcpp::get_logger(""), "cv_bridge exception: %s", e.what());
     }
     
-    if(cv_ptr->image.type()==0)
-    {
-        return cv_ptr->image.clone();
-    }
-    else
-    {
-        ORB_SLAM3::VerboseStream(ORB_SLAM3::Verbose::VERBOSITY_NORMAL) << "Error type" << std::endl;
-        return cv_ptr->image.clone();
-    }
+    return cv_ptr->image.clone();
 }
 
 void ImageGrabber::SyncWithImu()
@@ -168,7 +160,9 @@ void ImageGrabber::SyncWithImu()
 
                     cv::Point3f gyr(mpImuGb->imuBuf.front()->angular_velocity.x, mpImuGb->imuBuf.front()->angular_velocity.y, mpImuGb->imuBuf.front()->angular_velocity.z);
                     
-                    vImuMeas.push_back(ORB_SLAM3::IMU::Point(acc, gyr, t.seconds()));
+                    Eigen::Quaternionf quat(mpImuGb->imuBuf.front()->orientation.w, mpImuGb->imuBuf.front()->orientation.x,
+                                                mpImuGb->imuBuf.front()->orientation.y, mpImuGb->imuBuf.front()->orientation.z);
+                    vImuMeas.push_back(ORB_SLAM3::IMU::Point(acc, gyr, t.seconds(), quat));
 
                     Wbb << mpImuGb->imuBuf.front()->angular_velocity.x, mpImuGb->imuBuf.front()->angular_velocity.y, mpImuGb->imuBuf.front()->angular_velocity.z;
 
@@ -178,6 +172,8 @@ void ImageGrabber::SyncWithImu()
             mpImuGb->mBufMutex.unlock();
             
             // ORB-SLAM3 runs in TrackStereo()
+            if (vImuMeas.empty())
+                continue;
             Sophus::SE3f Tcw = pSLAM->TrackStereo(imLeft,imRight,tImLeft.seconds(),vImuMeas);
 
             publish_topics(msg_time, Wbb);
@@ -185,6 +181,7 @@ void ImageGrabber::SyncWithImu()
             {
                 publish_atlas(pSLAM->GetAtlas(), msg_time);
                 publish_kf(imLeft, msg_time);
+                publish_kf_right(imRight, msg_time);
             }
             std::chrono::milliseconds tSleep(1);
             std::this_thread::sleep_for(tSleep);

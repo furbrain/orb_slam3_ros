@@ -64,6 +64,7 @@ void publish_tf_transform(Sophus::SE3f, string, string, rclcpp::Time);
 void publish_body_odom(Sophus::SE3f, Eigen::Vector3f, Eigen::Vector3f, rclcpp::Time);
 void publish_kf_markers(std::vector<Sophus::SE3f>, rclcpp::Time);
 void publish_kf(cv::Mat, rclcpp::Time);
+void publish_kf_right(cv::Mat, rclcpp::Time);
 void publish_atlas(ORB_SLAM3::Atlas*, rclcpp::Time);
 
 void save_map_srv(const orb_slam3::srv::SaveMap::Request::SharedPtr, orb_slam3::srv::SaveMap::Response::SharedPtr);

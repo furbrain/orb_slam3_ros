@@ -59,10 +59,11 @@ set(ament_deps
 set(orb_targets
   #ros_mono
   #ros_mono_inertial
-  #ros_stereo
-  #ros_stereo_inertial
+  ros_stereo
+  ros_stereo_inertial
   #ros_rgbd
   ros_rgbd_inertial
+  process
 )
 
 set(srv_files

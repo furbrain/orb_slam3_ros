@@ -1411,7 +1411,7 @@ bool System::SaveAtlas(int type){
             mpAtlas->PreSave();
             // VerboseStream(Verbose::VERBOSITY_NORMAL) << "Finished presave operation" << endl;
 
-            string pathSaveFileName = "./";
+            string pathSaveFileName = "";
             pathSaveFileName = pathSaveFileName.append(mStrSaveAtlasToFile);
             pathSaveFileName = pathSaveFileName.append(".osa");
 
