@@ -400,6 +400,7 @@ void Optimizer::BundleAdjustment(const vector<KeyFrame *> &vpKFs,
   optimizer.initializeOptimization();
   optimizer.optimize(nIterations);
   Verbose::PrintMess("BA: End of the optimization", Verbose::VERBOSITY_NORMAL);
+  std::cout << "Chi2 after BA: " << optimizer.chi2() << "(" << (optimizer.chi2()/ optimizer.activeEdges().size()) << ")" << std::endl;
 
   // Recover optimized data
   // Keyframes

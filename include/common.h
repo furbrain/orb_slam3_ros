@@ -31,7 +31,7 @@
 #include <message_filters/sync_policies/approximate_time.h>
 
 #include <orb_slam3/srv/save_map.hpp> // This file is created automatically, see here http://wiki.ros.org/ROS/Tutorials/CreatingMsgAndSrv#Creating_a_srv
-
+#include <orb_slam3/msg/atlas.hpp> // This file is created automatically, see here http://wiki.ros.org/ROS/Tutorials/CreatingMsgAndSrv#Creating_a_srv
 
 // ORB-SLAM3-specific libraries
 #include "System.h"
@@ -65,6 +65,7 @@ void publish_body_odom(Sophus::SE3f, Eigen::Vector3f, Eigen::Vector3f, rclcpp::T
 void publish_kf_markers(std::vector<Sophus::SE3f>, rclcpp::Time);
 void publish_kf(cv::Mat, rclcpp::Time);
 void publish_kf_right(cv::Mat, rclcpp::Time);
+orb_slam3::msg::Atlas create_atlas_msg(ORB_SLAM3::Atlas *atlas, rclcpp::Time msg_time, std::string frame_id);
 void publish_atlas(ORB_SLAM3::Atlas*, rclcpp::Time);
 
 void save_map_srv(const orb_slam3::srv::SaveMap::Request::SharedPtr, orb_slam3::srv::SaveMap::Response::SharedPtr);

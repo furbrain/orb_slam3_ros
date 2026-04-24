@@ -409,9 +409,7 @@ void publish_kf_right(cv::Mat image, rclcpp::Time msg_time) {
 //     }
 //   }
 // }
-
-
-void publish_atlas(ORB_SLAM3::Atlas *atlas, rclcpp::Time msg_time) {
+orb_slam3::msg::Atlas create_atlas_msg(ORB_SLAM3::Atlas *atlas, rclcpp::Time msg_time, std::string frame_id) {
   std_msgs::msg::Header header;
   header.stamp = msg_time;
   header.frame_id = world_frame_id;
@@ -462,6 +460,11 @@ void publish_atlas(ORB_SLAM3::Atlas *atlas, rclcpp::Time msg_time) {
     }
     atlas_msg.maps.push_back(map_msg);
   }
+  return atlas_msg;
+}
+
+void publish_atlas(ORB_SLAM3::Atlas *atlas, rclcpp::Time msg_time) {
+  auto atlas_msg = create_atlas_msg(atlas, msg_time, world_frame_id);
   atlas_pub->publish(atlas_msg);
 }
 
