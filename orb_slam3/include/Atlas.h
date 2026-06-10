@@ -76,6 +76,7 @@ public:
     ~Atlas();
 
     void CreateNewMap();
+    void AddMap(Map* pMap);
     void ChangeMap(Map* pMap);
 
     unsigned long int GetLastInitKFid();
@@ -123,6 +124,12 @@ public:
     // Function for garantee the correction of serialization of this object
     void PreSave();
     void PostLoad();
+    void OffsetIDs(long unsigned int mp_offset, 
+        long unsigned int kf_offset, 
+        long unsigned int map_offset, 
+        long unsigned int cam_offset);
+
+    void ImportAtlas(Atlas* pAtlas);
 
     map<long unsigned int, KeyFrame*> GetAtlasKeyframes();
 

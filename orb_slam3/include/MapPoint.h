@@ -159,6 +159,7 @@ public:
 
     void PreSave(set<KeyFrame*>& spKF,set<MapPoint*>& spMP);
     void PostLoad(map<long unsigned int, KeyFrame*>& mpKFid, map<long unsigned int, MapPoint*>& mpMPid);
+    void OffsetIds(long unsigned int mp_offset, long unsigned int kf_offset, long unsigned int map_offset);
 
 public:
     long unsigned int mnId;

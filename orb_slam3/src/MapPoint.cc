@@ -635,4 +635,15 @@ void MapPoint::PostLoad(map<long unsigned int, KeyFrame*>& mpKFid, map<long unsi
     mBackupObservationsId2.clear();
 }
 
+void MapPoint::OffsetIds(long unsigned int mp_offset, long unsigned int kf_offset, long unsigned int map_offset)
+{
+    mnId += mp_offset;
+    mnFirstKFid += kf_offset;
+    mnOriginMapId += map_offset;
+    if (mnId >= nNextId) {
+        nNextId = mnId + 1;
+    }
+
+}
+
 } //namespace ORB_SLAM

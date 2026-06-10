@@ -26,6 +26,7 @@
   <depend>tf2_ros</depend>
   <depend>dynamic_reconfigure</depend>
   <depend>message_generation</depend>
+  <depend>ament_index_cpp</depend>
   <export>
       <build_type>ament_cmake</build_type>
   </export>

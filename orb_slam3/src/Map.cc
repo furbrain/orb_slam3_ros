@@ -493,5 +493,38 @@ void Map::PostLoad(KeyFrameDatabase* pKFDB, ORBVocabulary* pORBVoc/*, map<long u
     mvpBackupMapPoints.clear();
 }
 
+void Map::OffsetIDs(long unsigned int mp_offset, long unsigned int kf_offset, long unsigned int map_offset)
+{
+    mnId += map_offset;
+    mnInitKFid += kf_offset;
+    mnMaxKFid += kf_offset;
+    if (mnId >= nNextId) {
+        nNextId = mnId + 1;
+    }
+    for(MapPoint* pMPi : mspMapPoints)
+    {
+        if(!pMPi || pMPi->isBad())
+            continue;
 
+        pMPi->OffsetIds(mp_offset, kf_offset, map_offset);
+    }
+    for(KeyFrame* pKFi : mspKeyFrames)
+    {
+        if(!pKFi || pKFi->isBad())
+            continue;
+
+        pKFi->OffsetId(kf_offset);
+    }
+}
+
+void Map::UpdateKFDatabase(KeyFrameDatabase* pKFDB)
+{
+    for(KeyFrame* pKFi : mspKeyFrames)
+    {
+        if(!pKFi || pKFi->isBad())
+            continue;
+        pKFi->SetKeyFrameDatabase(pKFDB);
+        pKFDB->add(pKFi);
+    }
+}
 } //namespace ORB_SLAM3

@@ -8,6 +8,7 @@
 
 #include <std_msgs/msg/color_rgba.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
+#include <ament_index_cpp/get_package_share_directory.hpp>
 
 using std::placeholders::_1;
 using namespace std;
@@ -45,6 +46,42 @@ float setNoise(ORB_SLAM3::Map* map, float noise) {
     return first_noise;
 }
 
+void alignMap(ORB_SLAM3::Map* map) {
+    // compute the best fit rotation between the camera poses and the IMU poses in the map. 
+    // This is a complex problem that typically involves solving a Procrustes problem or using 
+    // SVD to find the optimal rotation that minimizes the distance between the two sets of orientations. 
+    auto kfs = map->GetAllKeyFrames();
+    if (kfs.size() < 5) {
+        ORB_SLAM3::VerboseStream(ORB_SLAM3::Verbose::VERBOSITY_NORMAL) << "Not enough keyframes to align map (need at least 5)";
+        return;
+    }
+    Eigen::Matrix3Xf cam_orientations(3,kfs.size()*3);
+    Eigen::Matrix3Xf imu_orientations(3, kfs.size()*3);
+    for (size_t i = 0; i < kfs.size(); i++) {
+        auto kf = kfs[i];
+        //if (kf->isBad()) continue;
+        auto cam_q = kf->GetPose().so3().inverse();
+        auto imu_q = kf->GetPoseFromEstimate().so3().inverse();
+        cam_orientations.block<3,3>(0,i*3) = cam_q.matrix();
+        imu_orientations.block<3,3>(0,i*3) = imu_q.matrix();
+    }
+    Eigen::Matrix4f T = Eigen::umeyama(cam_orientations, imu_orientations, false);
+    Eigen::Matrix3f R = T.block<3,3>(0,0);
+    Sophus::SE3f R_se3(R, Eigen::Vector3f::Zero());
+    for (ORB_SLAM3::KeyFrame* pKF : map->GetAllKeyFrames()) {
+        if (pKF->isBad()) continue;
+        auto pose = R_se3 * pKF->GetPose().inverse();
+        pKF->SetPose(pose.inverse());
+    }
+    for (ORB_SLAM3::MapPoint* pMP : map->GetAllMapPoints()) {
+        if (pMP->isBad()) continue;
+        auto pos = R_se3 * pMP->GetWorldPos();
+        pMP->SetWorldPos(pos);
+    }
+}
+
+
+
 void save_atlas(ORB_SLAM3::Atlas* atlas, std::string url) {
     ORB_SLAM3::VerboseStream(ORB_SLAM3::Verbose::VERBOSITY_NORMAL) << "Saving atlas to " << url.c_str();
     std::ofstream ofs(url, std::ios::binary);
@@ -79,15 +116,7 @@ void bundle_adjustment(ORB_SLAM3::Map* pMap, int num_iterations) {
     pMap->IncreaseChangeIndex();
 }
 
-void invertIMUMap(ORB_SLAM3::Map* pMap) {
-    for (ORB_SLAM3::KeyFrame* pKF : pMap->GetAllKeyFrames()) {
-        if (pKF->isBad()) continue;
-        pKF->SetImuPoseEstimate(pKF->GetImuPoseEstimate().inverse());
-    }
-}
-
-ORB_SLAM3::Atlas* load_atlas(std::string url, ORB_SLAM3::ORBVocabulary* mpVocabulary, ORB_SLAM3::KeyFrameDatabase* mpKeyFrameDatabase) {
-    ORB_SLAM3::VerboseStream(ORB_SLAM3::Verbose::VERBOSITY_NORMAL) << "Loading atlas from " << url.c_str();
+ORB_SLAM3::Atlas* load_atlas_from_file(const std::string &url) {
     ORB_SLAM3::Atlas *atlas = new ORB_SLAM3::Atlas();
     std::ifstream ifs(url, std::ios::binary);
     boost::archive::binary_iarchive ia(ifs);
@@ -95,44 +124,40 @@ ORB_SLAM3::Atlas* load_atlas(std::string url, ORB_SLAM3::ORBVocabulary* mpVocabu
     ia >> strFileVoc;
     ia >> strVocChecksum;
     ia >> atlas;
+    return atlas;
+}
+
+ORB_SLAM3::Atlas* prepare_atlas(std::string url, ORB_SLAM3::ORBVocabulary* mpVocabulary, ORB_SLAM3::KeyFrameDatabase* mpKeyFrameDatabase) {
+    ORB_SLAM3::VerboseStream(ORB_SLAM3::Verbose::VERBOSITY_NORMAL) << "Loading atlas from " << url.c_str();
+    ORB_SLAM3::Atlas *atlas = load_atlas_from_file(url);
     atlas->SetKeyFrameDababase(mpKeyFrameDatabase);
     atlas->SetORBVocabulary(mpVocabulary);
     atlas->PostLoad();
     atlas->PreSave();
     ORB_SLAM3::VerboseStream(ORB_SLAM3::Verbose::VERBOSITY_NORMAL) << "There are " << atlas->CountMaps() << " maps in the atlas";
+    for (ORB_SLAM3::Map* map : atlas->GetAllMaps()) {
+        alignMap(map);
+    }
     return atlas;
 }
 
-void clean_atlas(ORB_SLAM3::Atlas* atlas) {
-    for (ORB_SLAM3::Map* map : atlas->GetAllMaps()) {
-        for (ORB_SLAM3::KeyFrame* kf : map->GetAllKeyFrames()) {
-                if (kf->isBad()) continue;
-                // sanity check: does it have at least one map point?
-                if (kf->GetMapPointMatches().empty()) {
-                    ORB_SLAM3::VerboseStream(ORB_SLAM3::Verbose::VERBOSITY_NORMAL) << "Keyframe " << kf->mnId << " has no map points";
-                }
-        }
+vector<ORB_SLAM3::Map*> merge_atlas(ORB_SLAM3::Atlas* atlas, std::string url) {
+    // load the second atlas from the url, and merge it with the first atlas.
+    // need to fix the keyframeIDs and map point IDs in the second atlas to avoid conflicts with the first atlas.
+    //return all the new maps in the merged atlas.
+    ORB_SLAM3::Atlas *new_atlas = load_atlas_from_file(url);
+    auto vocab = atlas->GetORBVocabulary();
+    auto mpKeyFrameDatabase = new ORB_SLAM3::KeyFrameDatabase(*vocab);
+    new_atlas->SetKeyFrameDababase(mpKeyFrameDatabase);
+    new_atlas->SetORBVocabulary(vocab);
+    new_atlas->PostLoad();
+    new_atlas->PreSave();
+    auto new_maps = new_atlas->GetAllMaps();
+    for(ORB_SLAM3::Map* map : new_maps) {
+        alignMap(map);
     }
-    int good = 0;
-    int bad = 0;
-    for (auto* pMP : atlas->GetAllMapPoints()) {
-        if (pMP->isBad()) continue;
-        auto obs = pMP->GetObservations();
-        for (auto& [pKF, idx] : obs) {
-            auto mp = pKF->GetMapPoint(std::get<0>(idx));
-            if (mp != pMP) {
-                bad++;
-                if (mp == nullptr) {
-                    ORB_SLAM3::VerboseStream(ORB_SLAM3::Verbose::VERBOSITY_NORMAL) << "Keyframe " << pKF->mnId << " has broken link: map point " << std::get<0>(idx) << " should be " << pMP->mnId << ", but is null";
-                } else {
-                    ORB_SLAM3::VerboseStream(ORB_SLAM3::Verbose::VERBOSITY_NORMAL) << "Keyframe " << pKF->mnId << " has broken link: map point " << std::get<0>(idx) << " should be " << pMP->mnId << ", but is " << mp->mnId;
-                }
-            } else {
-                good++;
-            }
-        }
-    }
-    ORB_SLAM3::VerboseStream(ORB_SLAM3::Verbose::VERBOSITY_NORMAL) << "Good links: " << good << ", Bad links: " << bad;
+    atlas->ImportAtlas(new_atlas);
+    return new_maps;
 }
 
 ORB_SLAM3::Map* get_biggest_map(ORB_SLAM3::Atlas* atlas) {
@@ -146,6 +171,22 @@ ORB_SLAM3::Map* get_biggest_map(ORB_SLAM3::Atlas* atlas) {
     }
     return best_map;
 }
+
+
+void run_full_merge(ORB_SLAM3::Atlas* atlas, vector<ORB_SLAM3::Map*> new_maps) {
+    mpTracker = new ORB_SLAM3::Tracking(nullptr, atlas->GetORBVocabulary(), nullptr, atlas,
+                            atlas->GetKeyFrameDatabase(), strSettingsFile, mSensor, settings_, strSequence);
+    mpLocalMapper = new ORB_SLAM3::LocalMapping(this, atlas, m
+                             mpAtlas, mpKeyFrameDatabase, strSettingsFile, mSensor, settings_, strSequence);
+
+    //Initialize the Local Mapping thread and launch
+    mpLocalMapper = new LocalMapping(this, mpAtlas, mSensor==MONOCULAR || mSensor==IMU_MONOCULAR,
+                                     (mSensor==IMU_MONOCULAR || mSensor==IMU_STEREO || mSensor==IMU_RGBD) && settings_->useImuTrajectory(), strSequence);
+
+    for (ORB_SLAM3::Map* map : new_maps) {
+        alignMap(map);
+        bundle_adjustment(map, 100);
+    }
 
 
 rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr marker_array_pub;
@@ -283,39 +324,6 @@ void reset_orientations(ORB_SLAM3::Map* map) {
     }
 }
 
-Eigen::Matrix3f computeRotation(ORB_SLAM3::Map* map) {
-    // compute the best fit rotation between the camera poses and the IMU poses in the map. 
-    // This is a complex problem that typically involves solving a Procrustes problem or using 
-    // SVD to find the optimal rotation that minimizes the distance between the two sets of orientations. 
-    auto kfs = map->GetAllKeyFrames();
-    Eigen::Matrix3Xf cam_orientations(3,kfs.size()*3);
-    Eigen::Matrix3Xf imu_orientations(3, kfs.size()*3);
-    for (size_t i = 0; i < kfs.size(); i++) {
-        auto kf = kfs[i];
-        //if (kf->isBad()) continue;
-        auto cam_q = kf->GetPose().so3().inverse();
-        auto imu_q = kf->GetPoseFromEstimate().so3().inverse();
-        cam_orientations.block<3,3>(0,i*3) = cam_q.matrix();
-        imu_orientations.block<3,3>(0,i*3) = imu_q.matrix();
-    }
-    Eigen::Matrix4f T = Eigen::umeyama(cam_orientations, imu_orientations, false);
-    Eigen::Matrix3f R = T.block<3,3>(0,0);
-    return R;
-}
-
-void ApplyRotation(ORB_SLAM3::Map* map, const Eigen::Matrix3f& R) {
-    Sophus::SE3f R_se3(R, Eigen::Vector3f::Zero());
-    for (ORB_SLAM3::KeyFrame* pKF : map->GetAllKeyFrames()) {
-        if (pKF->isBad()) continue;
-        auto pose = R_se3 * pKF->GetPose().inverse();
-        pKF->SetPose(pose.inverse());
-    }
-    for (ORB_SLAM3::MapPoint* pMP : map->GetAllMapPoints()) {
-        if (pMP->isBad()) continue;
-        auto pos = R_se3 * pMP->GetWorldPos();
-        pMP->SetWorldPos(pos);
-    }
-}
 
 int main(int argc, char **argv)
 {
@@ -327,19 +335,20 @@ int main(int argc, char **argv)
     marker_array_imu_pub = node->create_publisher<visualization_msgs::msg::MarkerArray>("marker_array_imu", rclcpp::QoS(10));
     auto logger = node->get_logger();
     string strFileVoc, strVocChecksum;
-    string atlas_url;
+    string atlas_url, merge_url;
     world_frame_id = "map";
     atlas_url = node->declare_parameter("atlas_url", "");
+    merge_url = node->declare_parameter("merge_url", "");
     int num_iterations = node->declare_parameter("num_iterations", 5);
     float new_noise = node->declare_parameter("new_noise", -1.0);
-    bool invert_imu = node->declare_parameter("invert_imu", false);
     bool reset_orientation = node->declare_parameter("reset_orientations", true);
     if (atlas_url == "") {
         RCLCPP_ERROR(logger, "Please provide atlas_url in the launch file");
         rclcpp::shutdown();
         return 1;
     }
-    std::string strVocFile = node->declare_parameter("voc_file", "file_not_set");
+    auto default_voc_location = ament_index_cpp::get_package_share_directory("orb_slam3") + "/vocab/ORBvoc.txt.bin";
+    std::string strVocFile = node->declare_parameter("voc_file", default_voc_location);
     auto mpVocabulary = new ORB_SLAM3::ORBVocabulary();
     bool bVocLoad = mpVocabulary->loadFromBinFile(strVocFile);
     if (!bVocLoad) {
@@ -349,29 +358,22 @@ int main(int argc, char **argv)
         return 1;
     }
     auto mpKeyFrameDatabase = new ORB_SLAM3::KeyFrameDatabase(*mpVocabulary);
-    atlas = load_atlas(atlas_url, mpVocabulary, mpKeyFrameDatabase);
+    atlas = prepare_atlas(atlas_url, mpVocabulary, mpKeyFrameDatabase);
     best_map = get_biggest_map(atlas);
     atlas->ChangeMap(best_map);
-    if (invert_imu) {
-        invertIMUMap(best_map);
-    }
-    printAngles(atlas);
-    // if(reset_orientation) {
-    //     reset_orientations(best_map);
-    // }
-    auto R = computeRotation(best_map);
-    ApplyRotation(best_map, R);
-    //clean_atlas(atlas);
-    float noise = setNoise(best_map,new_noise);
+    auto new_maps = merge_atlas(atlas, merge_url);
+    ORB_SLAM3::VerboseStream(ORB_SLAM3::Verbose::VERBOSITY_NORMAL) << "There are " << atlas->CountMaps() << " maps in the atlas after merge";
+    // DO THE MAIN MERGE HERE...
+    //float noise = setNoise(best_map,new_noise);
     //printAngles(atlas);
-    ORB_SLAM3::VerboseStream(ORB_SLAM3::Verbose::VERBOSITY_NORMAL) << "Setting noise to " << new_noise << " (was " << noise << ")";   
-    if (num_iterations > 0) {
-        ORB_SLAM3::VerboseStream(ORB_SLAM3::Verbose::VERBOSITY_NORMAL) << "Running bundle adjustment with " << num_iterations << " iterations";
-        bundle_adjustment(best_map, num_iterations);
-        printAngles(atlas);
-    }
+    //ORB_SLAM3::VerboseStream(ORB_SLAM3::Verbose::VERBOSITY_NORMAL) << "Setting noise to " << new_noise << " (was " << noise << ")";   
+    // if (num_iterations > 0) {
+    //     ORB_SLAM3::VerboseStream(ORB_SLAM3::Verbose::VERBOSITY_NORMAL) << "Running bundle adjustment with " << num_iterations << " iterations";
+    //     bundle_adjustment(best_map, num_iterations);
+    //     printAngles(atlas);
+    // }
     //save_atlas(atlas, node->declare_parameter("atlas_save_url", "atlas_save.msg"));
-    auto timer = node->create_wall_timer(std::chrono::milliseconds(1000), timer_callback);
+    // auto timer = node->create_wall_timer(std::chrono::milliseconds(1000), timer_callback);
     fill_poses(best_map);
     run(node);
     rclcpp::shutdown();

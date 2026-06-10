@@ -41,6 +41,7 @@ find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
+find_package(ament_index_cpp REQUIRED)
 
 set(ament_deps
   cv_bridge
@@ -54,6 +55,7 @@ set(ament_deps
   sensor_msgs
   visualization_msgs
   Boost
+  ament_index_cpp
 )
 
 set(orb_targets

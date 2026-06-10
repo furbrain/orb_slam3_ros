@@ -841,6 +841,14 @@ float KeyFrame::ComputeSceneMedianDepth(const int q)
     return vDepths[(vDepths.size()-1)/q];
 }
 
+void KeyFrame::OffsetId(long unsigned int nOffset){
+    mnId += nOffset;
+    if (mnId >= nNextId) {
+        nNextId = mnId + 1;
+    }
+
+}
+
 void KeyFrame::SetNewBias(const IMU::Bias &b)
 {
     unique_lock<mutex> lock(mMutexPose);

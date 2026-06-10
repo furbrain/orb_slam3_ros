@@ -89,6 +89,12 @@ namespace ORB_SLAM3 {
                                  Eigen::Vector3f& x3Dtriangulated) = 0;
 
         unsigned int GetId() { return mnId; }
+        void OffsetId(long unsigned int nOffset){
+            mnId += nOffset;
+            if (mnId >= nNextId) {
+                nNextId = mnId + 1;
+            }
+        }
 
         unsigned int GetType() { return mnType; }
 

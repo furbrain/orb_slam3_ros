@@ -73,6 +73,13 @@ void Atlas::CreateNewMap()
     mspMaps.insert(mpCurrentMap);
 }
 
+void Atlas::AddMap(Map* pMap)
+{
+    unique_lock<mutex> lock(mMutexAtlas);
+    pMap->SetStoredMap();
+    mspMaps.insert(pMap);
+}
+
 void Atlas::ChangeMap(Map* pMap)
 {
     unique_lock<mutex> lock(mMutexAtlas);
@@ -341,6 +348,48 @@ void Atlas::PostLoad()
         numMP += pMi->GetAllMapPoints().size();
     }
     mvpBackupMaps.clear();
+}
+
+void Atlas::OffsetIDs(long unsigned int mp_offset, long unsigned int kf_offset, long unsigned int map_offset, long unsigned int cam_offset)
+{
+    for(Map* pMi : mspMaps)
+    {
+        pMi->OffsetIDs(mp_offset, kf_offset, map_offset);
+    }
+
+    for(GeometricCamera* pCam : mvpCameras)
+    {
+        pCam->OffsetId(cam_offset);
+    }
+}
+
+void Atlas::ImportAtlas(Atlas* pAtlas)
+{
+    // get id offsets
+    unsigned long int max_kf_id = 0, max_cam_id = 0, max_mp_id = 0, max_map_id = 0;
+    for (Map* map : mspMaps) {
+        for (KeyFrame* kf : map->GetAllKeyFrames()) {
+            if (kf->mnId > max_kf_id) max_kf_id = kf->mnId;
+        }
+        for (MapPoint* mp : map->GetAllMapPoints()) {
+            if (mp->mnId > max_mp_id) max_mp_id = mp->mnId;
+        }
+        if (map->GetId() > max_map_id) max_map_id = map->GetId();
+    }
+    for (GeometricCamera* cam : mvpCameras) {
+        if (cam->GetId() > max_cam_id) max_cam_id = cam->GetId();
+    }
+        // apply id offsets
+    pAtlas->OffsetIDs(max_mp_id + 1, max_kf_id + 1, max_map_id + 1, max_cam_id + 1);
+    for(Map* pMap_i : pAtlas->GetAllMaps())
+    {
+        pMap_i->UpdateKFDatabase(GetKeyFrameDatabase());
+        AddMap(pMap_i);
+    }
+    for(GeometricCamera* pCam_i : pAtlas->GetAllCameras())
+    {
+        AddCamera(pCam_i);
+    }
 }
 
 void Atlas::SetKeyFrameDababase(KeyFrameDatabase* pKFDB)
