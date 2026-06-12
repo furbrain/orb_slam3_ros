@@ -1892,10 +1892,13 @@ void Tracking::Track() {
             .count();
     vdIMUInteg_ms.push_back(timePreImu);
 #endif
-        } else if (mUseImuPose) {
-          SetImuPoseEstimate();
         }
       }
+  if ((mSensor == System::IMU_MONOCULAR || mSensor == System::IMU_STEREO ||
+       mSensor == System::IMU_RGBD) && !mUseImuTrajectory && mUseImuPose) {
+          SetImuPoseEstimate();
+        }
+
   mbCreatedMap = false;
 
   // Get Map Mutex -> Map cannot be changed
@@ -2009,7 +2012,7 @@ void Tracking::Track() {
             // std::cout << "mCurrentFrame.mTimeStamp:" <<
             // to_string(mCurrentFrame.mTimeStamp) << std::endl; std::cout <<
             // "mTimeStampLost:" << to_string(mTimeStampLost) << std::endl;
-            if (mCurrentFrame.mTimeStamp - mTimeStampLost > 3.0f && !bOK) {
+            if (mCurrentFrame.mTimeStamp - mTimeStampLost > 5.0f && !bOK) {
               mState = LOST;
               Verbose::PrintMess("Track Lost...", Verbose::VERBOSITY_NORMAL);
               bOK = false;
@@ -2350,6 +2353,7 @@ void Tracking::StereoInitialization() {
       mCurrentFrame.SetImuPoseVelocity(Rwb0, twb0, Vwb0); 
     } else if (mUseImuPose) {
       mCurrentFrame.SetPoseFromEstimate();
+      
     } else {
       mCurrentFrame.SetPose(Sophus::SE3f());
     }
@@ -2636,6 +2640,7 @@ void Tracking::CreateInitialMapMonocular() {
 
 void Tracking::CreateMapInAtlas() {
   mnLastInitFrameId = mCurrentFrame.mnId;
+  auto imu_pose = mCurrentFrame.GetImuPoseEstimate();
   mpAtlas->CreateNewMap();
   VerboseStream(Verbose::VERBOSITY_NORMAL) << "Creating Map" << std::endl;
   if ((mSensor == System::IMU_STEREO || mSensor == System::IMU_MONOCULAR ||
@@ -2675,6 +2680,8 @@ void Tracking::CreateMapInAtlas() {
 
   mLastFrame = Frame();
   mCurrentFrame = Frame();
+  mLastFrame.SetImuPoseEstimate(imu_pose);
+  mCurrentFrame.SetImuPoseEstimate(imu_pose);
   mvIniMatches.clear();
 
   mbCreatedMap = true;
