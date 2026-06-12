@@ -173,20 +173,20 @@ ORB_SLAM3::Map* get_biggest_map(ORB_SLAM3::Atlas* atlas) {
 }
 
 
-void run_full_merge(ORB_SLAM3::Atlas* atlas, vector<ORB_SLAM3::Map*> new_maps) {
-    mpTracker = new ORB_SLAM3::Tracking(nullptr, atlas->GetORBVocabulary(), nullptr, atlas,
-                            atlas->GetKeyFrameDatabase(), strSettingsFile, mSensor, settings_, strSequence);
-    mpLocalMapper = new ORB_SLAM3::LocalMapping(this, atlas, m
-                             mpAtlas, mpKeyFrameDatabase, strSettingsFile, mSensor, settings_, strSequence);
+// void run_full_merge(ORB_SLAM3::Atlas* atlas, vector<ORB_SLAM3::Map*> new_maps) {
+//     mpTracker = new ORB_SLAM3::Tracking(nullptr, atlas->GetORBVocabulary(), nullptr, atlas,
+//                             atlas->GetKeyFrameDatabase(), strSettingsFile, mSensor, settings_, strSequence);
+//     mpLocalMapper = new ORB_SLAM3::LocalMapping(this, atlas, m
+//                              mpAtlas, mpKeyFrameDatabase, strSettingsFile, mSensor, settings_, strSequence);
 
-    //Initialize the Local Mapping thread and launch
-    mpLocalMapper = new LocalMapping(this, mpAtlas, mSensor==MONOCULAR || mSensor==IMU_MONOCULAR,
-                                     (mSensor==IMU_MONOCULAR || mSensor==IMU_STEREO || mSensor==IMU_RGBD) && settings_->useImuTrajectory(), strSequence);
+//     //Initialize the Local Mapping thread and launch
+//     mpLocalMapper = new LocalMapping(this, mpAtlas, mSensor==MONOCULAR || mSensor==IMU_MONOCULAR,
+//                                      (mSensor==IMU_MONOCULAR || mSensor==IMU_STEREO || mSensor==IMU_RGBD) && settings_->useImuTrajectory(), strSequence);
 
-    for (ORB_SLAM3::Map* map : new_maps) {
-        alignMap(map);
-        bundle_adjustment(map, 100);
-    }
+//     for (ORB_SLAM3::Map* map : new_maps) {
+//         alignMap(map);
+//         bundle_adjustment(map, 100);
+//     }
 
 
 rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr marker_array_pub;
