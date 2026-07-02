@@ -43,6 +43,9 @@ find_package(visualization_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(ament_index_cpp REQUIRED)
 
+find_package(ament_cmake_python REQUIRED)
+find_package(pybind11 REQUIRED)
+
 set(ament_deps
   cv_bridge
   image_transport
@@ -65,7 +68,6 @@ set(orb_targets
   ros_stereo_inertial
   #ros_rgbd
   ros_rgbd_inertial
-  process
 )
 
 set(srv_files
@@ -248,6 +250,16 @@ foreach(tgt IN LISTS orb_targets)
   ament_target_dependencies(${tgt} ${ament_deps})  
 endforeach()
 
+add_executable(process
+    src/process.cc
+    src/common.cc
+    src/utils.cc
+)
+target_link_libraries(process ${PROJECT_NAME}_lib)
+rosidl_target_interfaces(process ${PROJECT_NAME} "rosidl_typesupport_cpp")
+ament_target_dependencies(process ${ament_deps})  
+    
+
 
 #ament_target_dependencies(ros_mono_inertial ${ament_deps})
 #ament_target_dependencies(ros_stereo ${ament_deps})
@@ -257,10 +269,54 @@ endforeach()
 
 install(TARGETS
   ${orb_targets}
+  process
   DESTINATION lib/${PROJECT_NAME})
 
 install(FILES
   orb_slam3/Vocabulary/ORBvoc.txt.bin
   DESTINATION share/${PROJECT_NAME}/vocab)
+  
+# PYTHON BINDINGS
+
+
+set(PYTHON_INSTALL_DIR "lib/python3.8/site-packages")
+
+pybind11_add_module(orb_slam3_py MODULE
+  python/bindings.cc
+  python/bind_mappoint.cc
+  python/bind_keyframe.cc
+  python/bind_map.cc
+  python/bind_atlas.cc
+  python/bind_utils.cc
+  src/utils.cc
+)
+
+target_include_directories(orb_slam3_py PRIVATE
+  ${PROJECT_SOURCE_DIR}
+  ${PROJECT_SOURCE_DIR}/orb_slam3/include
+  ${PROJECT_SOURCE_DIR}/orb_slam3/include/CameraModels
+  ${PROJECT_SOURCE_DIR}/orb_slam3/Thirdparty/Sophus
+  ${EIGEN3_INCLUDE_DIR}
+)
+
+target_link_libraries(orb_slam3_py PRIVATE
+  ${PROJECT_NAME}_lib
+  ament_index_cpp::ament_index_cpp
+)
+
+install(TARGETS orb_slam3_py
+  DESTINATION ${PYTHON_INSTALL_DIR}
+)
+
+install(TARGETS ${PROJECT_NAME}_lib
+  LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib
+)
+
+install(FILES
+  ${PROJECT_SOURCE_DIR}/orb_slam3/Thirdparty/DBoW2/lib/libDBoW2.so
+  ${PROJECT_SOURCE_DIR}/orb_slam3/Thirdparty/g2o/lib/libg2o.so
+  DESTINATION lib
+)
 
 ament_package()

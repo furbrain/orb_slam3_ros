@@ -340,7 +340,7 @@ void publish_kf_markers(std::vector<Sophus::SE3f> vKFposes,
   kf_markers.type = visualization_msgs::msg::Marker::SPHERE_LIST;
   kf_markers.action = visualization_msgs::msg::Marker::ADD;
   kf_markers.pose.orientation.w = 1.0;
-  kf_markers.lifetime = rclcpp::Duration::from_nanoseconds(0);
+  kf_markers.lifetime = rclcpp::Duration(0,0);
 
   kf_markers.id = 0;
   kf_markers.scale.x = 0.05;
