@@ -279,7 +279,7 @@ install(FILES
 # PYTHON BINDINGS
 
 
-set(PYTHON_INSTALL_DIR "lib/python3.8/site-packages")
+set(PYTHON_INSTALL_DIR "lib/python3.11/site-packages")
 
 pybind11_add_module(orb_slam3_py MODULE
   python/bindings.cc

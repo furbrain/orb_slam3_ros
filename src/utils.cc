@@ -5,6 +5,10 @@
 #include <boost/serialization/base_object.hpp>
 #include <boost/serialization/string.hpp>
 #include <ament_index_cpp/get_package_share_directory.hpp>
+#include <Eigen/Dense>
+#include <Eigen/SVD>
+#include <sophus/se3.hpp>
+#include <vector>
 
 ORB_SLAM3::ORBVocabulary *vocab = nullptr;
 
@@ -110,3 +114,133 @@ ORB_SLAM3::Map* get_biggest_map(ORB_SLAM3::Atlas* atlas) {
     return best_map;
 }
 
+
+// Returns T such that q_i ≈ T * p_i  (T maps B-frame points into A-frame)
+Sophus::SE3f HornAlignment(const std::vector<Eigen::Vector3f>& src, // map B points
+                            const std::vector<Eigen::Vector3f>& dst) // map A points
+{
+    assert(src.size() == dst.size() && src.size() >= 3);
+    const int N = src.size();
+
+    // 1. Centroids
+    Eigen::Vector3f centroidSrc = Eigen::Vector3f::Zero();
+    Eigen::Vector3f centroidDst = Eigen::Vector3f::Zero();
+    for (int i = 0; i < N; ++i) { centroidSrc += src[i]; centroidDst += dst[i]; }
+    centroidSrc /= N;
+    centroidDst /= N;
+
+    // 2. Center the point sets
+    std::vector<Eigen::Vector3f> srcC(N), dstC(N);
+    for (int i = 0; i < N; ++i) {
+        srcC[i] = src[i] - centroidSrc;
+        dstC[i] = dst[i] - centroidDst;
+    }
+
+    // 3. Cross-covariance matrix H = sum(srcC_i * dstC_i^T)
+    Eigen::Matrix3f H = Eigen::Matrix3f::Zero();
+    for (int i = 0; i < N; ++i)
+        H += srcC[i] * dstC[i].transpose();
+
+    // 4. SVD of H, rotation R = V * U^T
+    Eigen::JacobiSVD<Eigen::Matrix3f> svd(H, Eigen::ComputeFullU | Eigen::ComputeFullV);
+    Eigen::Matrix3f U = svd.matrixU();
+    Eigen::Matrix3f V = svd.matrixV();
+    Eigen::Matrix3f R = V * U.transpose();
+
+    // 5. Reflection check — if det(R) < 0, flip sign of smallest singular vector
+    if (R.determinant() < 0) {
+        Eigen::Matrix3f V_fixed = V;
+        V_fixed.col(2) *= -1;
+        R = V_fixed * U.transpose();
+    }
+
+    // 6. Translation
+    Eigen::Vector3f t = centroidDst - R * centroidSrc;
+
+    return Sophus::SE3f(R, t);
+}
+
+#include <random>
+
+
+RansacResult RansacHornAlignment(
+    const std::vector<Eigen::Vector3f>& src,   // map B points, index-aligned with dst
+    const std::vector<Eigen::Vector3f>& dst,   // map A points
+    float inlierThreshold,             // metres — tune to your map's scale/noise
+    int maxIterations,
+    int minInliersToAccept)
+{
+    const int N = src.size();
+    assert(N == (int)dst.size());
+
+    std::mt19937 rng(12345);
+    std::uniform_int_distribution<int> dist(0, N - 1);
+
+    RansacResult best;
+
+    for (int iter = 0; iter < maxIterations; ++iter) {
+        // 1. Pick 3 distinct random correspondences (minimal set for rigid 3D)
+        int i0, i1, i2;
+        i0 = dist(rng);
+        do { i1 = dist(rng); } while (i1 == i0);
+        do { i2 = dist(rng); } while (i2 == i0 || i2 == i1);
+
+        std::vector<Eigen::Vector3f> sampleSrc = {src[i0], src[i1], src[i2]};
+        std::vector<Eigen::Vector3f> sampleDst = {dst[i0], dst[i1], dst[i2]};
+
+        // Skip degenerate (near-collinear) samples
+        Eigen::Vector3f v1 = sampleSrc[1] - sampleSrc[0];
+        Eigen::Vector3f v2 = sampleSrc[2] - sampleSrc[0];
+        if (v1.cross(v2).norm() < 1e-6f) continue;
+
+        Sophus::SE3f T = HornAlignment(sampleSrc, sampleDst);
+
+        // 2. Count inliers over the FULL correspondence set
+        std::vector<int> inliers;
+        inliers.reserve(N);
+        for (int i = 0; i < N; ++i) {
+            Eigen::Vector3f predicted = T * src[i];
+            float err = (predicted - dst[i]).norm();
+            if (err < inlierThreshold)
+                inliers.push_back(i);
+        }
+
+        if ((int)inliers.size() > best.numInliers) {
+            best.numInliers = inliers.size();
+            best.inlierIndices = inliers;
+            best.T = T; // will be refined below
+        }
+    }
+
+    // 3. Refine: re-run Horn's method using ALL inliers from the best model
+    if (best.numInliers >= minInliersToAccept) {
+        std::vector<Eigen::Vector3f> inlierSrc, inlierDst;
+        for (int idx : best.inlierIndices) {
+            inlierSrc.push_back(src[idx]);
+            inlierDst.push_back(dst[idx]);
+        }
+        best.T = HornAlignment(inlierSrc, inlierDst);
+    }
+
+    return best;
+}
+
+// Accepts numpy 3xN (or Nx3, see note below) directly via automatic Eigen conversion
+RansacResult RansacHornAlignmentPy(const Eigen::MatrixX3f& src,  // 3xN
+                                    const Eigen::MatrixX3f& dst,  // 3xN
+                                    float inlierThreshold,
+                                    int maxIterations,
+                                    int minInliersToAccept)
+{
+    assert(src.rows() == dst.rows());
+    const int N = src.rows();
+
+    // Convert to your existing vector<Vector3f> interface
+    std::vector<Eigen::Vector3f> srcVec(N), dstVec(N);
+    for (int i = 0; i < N; ++i) {
+        srcVec[i] = src.row(i).transpose();
+        dstVec[i] = dst.row(i).transpose();
+    }
+
+    return RansacHornAlignment(srcVec, dstVec, inlierThreshold, maxIterations, minInliersToAccept);
+}
