@@ -61,24 +61,6 @@ void save_atlas(ORB_SLAM3::Atlas* atlas, std::string url) {
     file.close();
 }
 
-void bundle_adjustment(ORB_SLAM3::Map* pMap, int num_iterations) {
-    ORB_SLAM3::Optimizer::GlobalBundleAdjustemnt(pMap, num_iterations);
-    // for (ORB_SLAM3::KeyFrame* pKF : pMap->GetAllKeyFrames()) {
-    //     if (pKF->isBad()) continue;
-    //     std::cout << pKF->mTcwGBA.so3().unit_quaternion() << std::endl;
-    //     pKF->SetPose(pKF->mTcwGBA);
-    // }
-
-    // for (ORB_SLAM3::MapPoint* pMP : pMap->GetAllMapPoints()) {
-    //     if (pMP->isBad()) continue;
-    //     pMP->SetWorldPos(pMP->mPosGBA);
-    //     pMP->UpdateNormalAndDepth();
-    // }
-
-    pMap->InformNewBigChange();
-    pMap->IncreaseChangeIndex();
-}
-
 
 
 
@@ -262,7 +244,9 @@ int main(int argc, char **argv)
     atlas = prepare_atlas(atlas_url, strVocFile);
     best_map = get_biggest_map(atlas);
     atlas->ChangeMap(best_map);
-    auto new_maps = merge_atlas(atlas, merge_url);
+    if (!merge_url.empty()) {
+        auto new_maps = merge_atlas(atlas, merge_url);
+    }
     ORB_SLAM3::VerboseStream(ORB_SLAM3::Verbose::VERBOSITY_NORMAL) << "There are " << atlas->CountMaps() << " maps in the atlas after merge";
     // DO THE MAIN MERGE HERE...
     //float noise = setNoise(best_map,new_noise);
@@ -274,7 +258,7 @@ int main(int argc, char **argv)
     //     printAngles(atlas);
     // }
     //save_atlas(atlas, node->declare_parameter("atlas_save_url", "atlas_save.msg"));
-    // auto timer = node->create_wall_timer(std::chrono::milliseconds(1000), timer_callback);
+    auto timer = node->create_wall_timer(std::chrono::milliseconds(1000), timer_callback);
     fill_poses(best_map);
     run(node);
     rclcpp::shutdown();

@@ -1,7 +1,8 @@
 #include "utils.h"
 
-#include <boost/archive/text_iarchive.hpp>
+#include <openssl/md5.h>
 #include <boost/archive/binary_iarchive.hpp>
+#include <boost/archive/binary_oarchive.hpp>
 #include <boost/serialization/base_object.hpp>
 #include <boost/serialization/string.hpp>
 #include <ament_index_cpp/get_package_share_directory.hpp>
@@ -9,8 +10,49 @@
 #include <Eigen/SVD>
 #include <sophus/se3.hpp>
 #include <vector>
+#include "Atlas.h"
+#include "Map.h"
+#include "KeyFrame.h"
+#include "MapPoint.h"
+#include "Optimizer.h"
+#include "Converter.h"
+#include <unordered_set>
 
 ORB_SLAM3::ORBVocabulary *vocab = nullptr;
+
+string CalculateCheckSum(string filename)
+{
+    string checksum = "";
+
+    unsigned char c[MD5_DIGEST_LENGTH];
+
+    std::ios_base::openmode flags = std::ios::in;
+
+    ifstream f(filename.c_str(), flags);
+    if ( !f.is_open() ) return checksum;
+
+    MD5_CTX md5Context;
+    char buffer[1024];
+
+    MD5_Init (&md5Context);
+    while ( int count = f.readsome(buffer, sizeof(buffer)))
+    {
+        MD5_Update(&md5Context, buffer, count);
+    }
+
+    f.close();
+
+    MD5_Final(c, &md5Context );
+
+    for(int i = 0; i < MD5_DIGEST_LENGTH; i++)
+    {
+        char aux[10];
+        sprintf(aux,"%02x", c[i]);
+        checksum = checksum + aux;
+    }
+
+    return checksum;
+}
 
 ORB_SLAM3::Atlas* load_atlas_from_file(const std::string &url) {
     ORB_SLAM3::Atlas *atlas = new ORB_SLAM3::Atlas();
@@ -22,6 +64,22 @@ ORB_SLAM3::Atlas* load_atlas_from_file(const std::string &url) {
     ia >> atlas;
     return atlas;
 }
+
+
+void save_atlas_to_file(ORB_SLAM3::Atlas* atlas, const std::string &url, std::string strVocFile) {
+    std::ofstream ofs(url, std::ios::binary);
+    boost::archive::binary_oarchive oa(ofs);
+    if (strVocFile.empty()) {
+            strVocFile = ament_index_cpp::get_package_share_directory("orb_slam3") + "/vocab/ORBvoc.txt.bin";
+    }
+
+    std::string strVocChecksum = CalculateCheckSum(strVocFile); 
+    atlas->PreSave();
+    oa << strVocFile;
+    oa << strVocChecksum;
+    oa << atlas;
+}
+
 
 void alignMap(ORB_SLAM3::Map* map) {
     // compute the best fit rotation between the camera poses and the IMU poses in the map. 
@@ -244,3 +302,119 @@ RansacResult RansacHornAlignmentPy(const Eigen::MatrixX3f& src,  // 3xN
 
     return RansacHornAlignment(srcVec, dstVec, inlierThreshold, maxIterations, minInliersToAccept);
 }
+
+// OfflineMerge.cc
+// Standalone offline map-merge for ORB-SLAM3 Atlas, based on the logic in
+// LoopClosing::MergeLocal, but with the threading/mutex/tracker-state
+// machinery stripped out since there's no live tracking thread here.
+
+// pMapA survives, pMapB is consumed. TransformBtoA maps points/poses
+// from Map B's frame into Map A's frame (your Horn's-method result).
+// vMatchedPairs: MapPoint* in B  ->  corresponding MapPoint* in A,
+// as determined by your descriptor matching + RANSAC inlier set.
+void OfflineMergeMaps(ORB_SLAM3::Map* pMapA, ORB_SLAM3::Map* pMapB,
+                      const Sophus::SE3f& TransformBtoA,
+                      const std::vector<std::pair<ORB_SLAM3::MapPoint*, ORB_SLAM3::MapPoint*>>& vMatchedPairs)
+{
+    // ---- 1. Transform every KeyFrame and MapPoint in B into A's frame ----
+    const std::vector<ORB_SLAM3::KeyFrame*> vpKFsB = pMapB->GetAllKeyFrames();
+    const std::vector<ORB_SLAM3::MapPoint*> vpMPsB = pMapB->GetAllMapPoints();
+
+    for (ORB_SLAM3::KeyFrame* pKF : vpKFsB) {
+        if (!pKF || pKF->isBad()) continue;
+        Sophus::SE3f Twc = pKF->GetPoseInverse();      // B-frame pose
+        Sophus::SE3f TwcNew = TransformBtoA * Twc;     // into A-frame
+        pKF->SetPose(TwcNew.inverse());
+    }
+
+    std::unordered_set<ORB_SLAM3::MapPoint*> spMatchedInB;
+    for (auto& pr : vMatchedPairs) spMatchedInB.insert(pr.first);
+
+    for (ORB_SLAM3::MapPoint* pMP : vpMPsB) {
+        if (!pMP || pMP->isBad()) continue;
+        if (spMatchedInB.count(pMP)) continue; // handled by fuse step below
+        Eigen::Vector3f p = pMP->GetWorldPos();
+        pMP->SetWorldPos(TransformBtoA * p);
+    }
+
+    // ---- 2. Move all of B's KeyFrames and unmatched MapPoints into A ----
+    for (ORB_SLAM3::KeyFrame* pKF : vpKFsB) {
+        if (!pKF || pKF->isBad()) continue;
+        pKF->UpdateMap(pMapA);
+        pMapA->AddKeyFrame(pKF);
+        pMapB->EraseKeyFrame(pKF); // detach from B's bookkeeping only
+    }
+
+    for (ORB_SLAM3::MapPoint* pMP : vpMPsB) {
+        if (!pMP || pMP->isBad()) continue;
+        if (spMatchedInB.count(pMP)) continue;
+        pMP->UpdateMap(pMapA);
+        pMapA->AddMapPoint(pMP);
+        pMapB->EraseMapPoint(pMP);
+    }
+
+    // ---- 3. Fuse duplicate MapPoints found by your descriptor matching ----
+    // Replace() redirects every KeyFrame observation of the loser onto the
+    // survivor, merges the observation counts, and marks the loser bad.
+    // We keep the point from A (better-established, usually more observations)
+    // as the survivor, unless B's has strictly more observations.
+    std::unordered_set<ORB_SLAM3::KeyFrame*> spAffectedKFs;
+
+    for (auto& pr : vMatchedPairs) {
+        ORB_SLAM3::MapPoint* pMPb = pr.first;
+        ORB_SLAM3::MapPoint* pMPa = pr.second;
+        if (!pMPb || !pMPa || pMPb->isBad() || pMPa->isBad()) continue;
+
+        ORB_SLAM3::MapPoint* survivor = pMPa;
+        ORB_SLAM3::MapPoint* loser = pMPb;
+        if (pMPb->Observations() > pMPa->Observations())
+            std::swap(survivor, loser);
+
+        // Grab loser's observers before Replace() clears them
+        for (auto& obs : loser->GetObservations())
+            spAffectedKFs.insert(obs.first);
+
+        loser->UpdateMap(pMapA); // Replace() expects both in same map bookkeeping
+        survivor->Replace(loser);
+    }
+
+    // ---- 4. Rebuild covisibility graph across the seam ----
+    // UpdateConnections() on every KF that had an observation touched by the
+    // fuse step re-derives shared-observation edges, which is what actually
+    // stitches the two formerly-separate covisibility graphs together.
+    for (ORB_SLAM3::KeyFrame* pKF : spAffectedKFs) {
+        if (pKF && !pKF->isBad())
+            pKF->UpdateConnections();
+    }
+    // Also refresh connections for all of B's (now A's) keyframes, since
+    // their neighbours have changed maps.
+    for (ORB_SLAM3::KeyFrame* pKF : vpKFsB) {
+        if (pKF && !pKF->isBad())
+            pKF->UpdateConnections();
+    }
+
+    // ---- 5. Clean up Map B and the Atlas ----
+    pMapA->IncreaseChangeIndex();
+    // pMapB is now empty; the Atlas-level removal is left to the caller,
+    // e.g. Atlas::RemoveMap or similar, since Atlas ownership semantics
+    // aren't uniform across ORB-SLAM3 versions.
+}
+
+void bundle_adjustment(ORB_SLAM3::Map* pMap, int num_iterations) {
+    ORB_SLAM3::Optimizer::GlobalBundleAdjustemnt(pMap, num_iterations);
+    // for (ORB_SLAM3::KeyFrame* pKF : pMap->GetAllKeyFrames()) {
+    //     if (pKF->isBad()) continue;
+    //     std::cout << pKF->mTcwGBA.so3().unit_quaternion() << std::endl;
+    //     pKF->SetPose(pKF->mTcwGBA);
+    // }
+
+    // for (ORB_SLAM3::MapPoint* pMP : pMap->GetAllMapPoints()) {
+    //     if (pMP->isBad()) continue;
+    //     pMP->SetWorldPos(pMP->mPosGBA);
+    //     pMP->UpdateNormalAndDepth();
+    // }
+
+    pMap->InformNewBigChange();
+    pMap->IncreaseChangeIndex();
+}
+
