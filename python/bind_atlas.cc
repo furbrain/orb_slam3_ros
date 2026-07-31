@@ -9,8 +9,14 @@ using namespace ORB_SLAM3;
 
 void bind_atlas(py::module &m) {
     py::class_<Atlas>(m, "Atlas")
+        .def("get_keyframe_database", &Atlas::GetKeyFrameDatabase,
+             py::return_value_policy::reference)
         .def("get_current_map", &Atlas::GetCurrentMap,
              py::return_value_policy::reference)
+        .def("erase_map", [](Atlas &atlas, Map* map) {
+            atlas.SetMapBad(map);
+            atlas.RemoveBadMaps();
+        })
         .def("get_all_maps", &Atlas::GetAllMaps,
              py::return_value_policy::reference)
         .def("count_maps", &Atlas::CountMaps)
@@ -34,5 +40,8 @@ void bind_atlas(py::module &m) {
                 all.insert(all.end(), mps.begin(), mps.end());
             }
             return all;
-        }, py::return_value_policy::reference);
+        }, py::return_value_policy::reference)
+        .def_readonly("surveys", &Atlas::mmvSurveys)
+        .def("add_survey", &Atlas::AddSurvey, py::arg("dataset"), py::arg("legs"))
+        .def("clear_surveys", &Atlas::ClearSurveys);
 }

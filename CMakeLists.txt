@@ -290,6 +290,9 @@ pybind11_add_module(orb_slam3_py MODULE
   python/bind_map.cc
   python/bind_atlas.cc
   python/bind_utils.cc
+  python/bind_kfdb.cc
+  python/bind_aruco.cc
+  python/bind_survey.cc
   src/utils.cc
 )
 

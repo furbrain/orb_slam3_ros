@@ -1,10 +1,20 @@
-// bind_keyframe.cpp
+ // bind_keyframe.cpp
 #include <pybind11/pybind11.h>
 #include <pybind11/eigen.h>
 #include <pybind11/stl.h>
 #include "KeyFrame.h"
 #include <opencv2/core/eigen.hpp>
 #include "pose_utils.h"
+
+#include "DBoW2/DBoW2/BowVector.h"   // DBoW2
+
+namespace pybind11 { namespace detail {
+
+template <>
+struct type_caster<DBoW2::BowVector>
+    : map_caster<DBoW2::BowVector, DBoW2::WordId, DBoW2::WordValue> {};
+
+}} // namespace pybind11::detail
 
 namespace py = pybind11;
 using namespace ORB_SLAM3;
@@ -76,5 +86,14 @@ void bind_keyframe(py::module &m) {
             Eigen::Matrix<uint8_t, Eigen::Dynamic, Eigen::Dynamic> desc;
             cv::cv2eigen(kf.mDistCoef, desc);
             return desc;
+        })
+        .def_readonly("aruco_observations", &KeyFrame::mvArucoObservations)
+        .def("add_aruco_observation", &KeyFrame::AddArucoObservation, py::arg("obs"))
+        .def("clear_aruco_observations", &KeyFrame::ClearArucoObservations)
+        .def("__repr__", [](KeyFrame &kf) {
+            return "<KeyFrame id=" + std::to_string(kf.mnId) + 
+                   " timestamp=" + std::to_string(kf.mTimeStamp) + 
+                   " num_keypoints=" + std::to_string(kf.N) + 
+                   " num_map_points=" + std::to_string(kf.GetNumberMPs()) + ">";
         });
 }
