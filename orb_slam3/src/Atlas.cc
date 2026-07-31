@@ -450,4 +450,14 @@ map<long unsigned int, KeyFrame*> Atlas::GetAtlasKeyframes()
     return mpIdKFs;
 }
 
+void Atlas::AddSurvey(int dataset, std::vector<Leg> &legs)
+{
+    mmvSurveys[dataset] = legs;
+}
+
+void Atlas::ClearSurveys()
+{
+    mmvSurveys.clear();
+}
+
 } //namespace ORB_SLAM3

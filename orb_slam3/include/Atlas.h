@@ -25,6 +25,7 @@
 #include "GeometricCamera.h"
 #include "Pinhole.h"
 #include "KannalaBrandt8.h"
+#include "Surveys.h"
 
 #include <set>
 #include <mutex>
@@ -142,6 +143,11 @@ public:
     long unsigned int GetNumLivedKF();
 
     long unsigned int GetNumLivedMP();
+    
+    std::map<int, std::vector<Leg> > mmvSurveys;
+    
+    void AddSurvey(int dataset, std::vector<Leg> &legs);
+    void ClearSurveys();
 
 protected:
 
