@@ -27,6 +27,7 @@
 #include "ORBextractor.h"
 #include "Frame.h"
 #include "KeyFrameDatabase.h"
+#include "ArucoObservation.h"
 #include "ImuTypes.h"
 
 #include "GeometricCamera.h"
@@ -194,6 +195,11 @@ class KeyFrame
         ar & mbHasVelocity;
         serializeQuat<Archive>(ar, mImuPoseEstimate, version);
         ar & mfImuPoseNoise;
+
+        if (version >= 1) {
+            ar & mnDataset;
+            ar & mvArucoObservations;
+        }
     }
 
 public:
@@ -434,6 +440,11 @@ public:
     std::vector <KeyFrame*> mvpLoopCandKFs;
     std::vector <KeyFrame*> mvpMergeCandKFs;
 
+    // The following variable and functions are related to the cave aruco findings
+    std::vector <struct ArucoObservation> mvArucoObservations;
+    void AddArucoObservation(const struct ArucoObservation &obs);
+    void ClearArucoObservations();    
+
     //bool mbHasHessian;
     //cv::Mat mHessianPose;
 
@@ -557,5 +568,7 @@ public:
 };
 
 } //namespace ORB_SLAM
+
+BOOST_CLASS_VERSION(ORB_SLAM3::KeyFrame, 1)
 
 #endif // KEYFRAME_H

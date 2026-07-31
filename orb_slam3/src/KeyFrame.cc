@@ -1199,4 +1199,15 @@ void KeyFrame::SetKeyFrameDatabase(KeyFrameDatabase* pKFDB)
     mpKeyFrameDB = pKFDB;
 }
 
+void KeyFrame::AddArucoObservation(const struct ArucoObservation &obs)
+{
+    mvArucoObservations.push_back(obs);
+}
+
+void KeyFrame::ClearArucoObservations()
+{
+    mvArucoObservations.clear();
+}
+
+
 } //namespace ORB_SLAM

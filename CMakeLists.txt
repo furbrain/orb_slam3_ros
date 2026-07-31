@@ -166,6 +166,7 @@ add_library(${PROJECT_NAME}_lib SHARED
   orb_slam3/include/SerializationUtils.h
   orb_slam3/include/Config.h
   orb_slam3/include/Settings.h
+  orb_slam3/include/ArucoObservation.h
 )
 
 target_link_libraries(${PROJECT_NAME}_lib

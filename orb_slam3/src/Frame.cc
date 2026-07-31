@@ -482,8 +482,7 @@ void Frame::SetPoseFromEstimate()
 Sophus::SE3f Frame::GetPoseFromEstimate() const
 {
     Sophus::SO3f rwb(mImuPoseEstimate);
-    Eigen::Vector3f tbw;
-    tbw.setZero();
+    Eigen::Vector3f tbw = Eigen::Vector3f::Zero();
     Sophus::SE3f Tcw = mImuCalib.mTcb * Sophus::SE3f(rwb.inverse(), tbw);
     return Tcw;
 }
