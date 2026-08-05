@@ -61,13 +61,14 @@ string CalculateCheckSum(string filename)
 ORB_SLAM3::Atlas* load_atlas_from_file(const std::string &url, bool binary) {
     ORB_SLAM3::Atlas *atlas = new ORB_SLAM3::Atlas();
     std::string strFileVoc, strVocChecksum;
-    std::ifstream ifs(url, std::ios::binary);
     if (binary) {
+        std::ifstream ifs(url, std::ios::binary);
         boost::archive::binary_iarchive ia(ifs);
         ia >> strFileVoc;
         ia >> strVocChecksum;
         ia >> atlas;
     } else {
+        std::ifstream ifs(url, std::ios::binary);
         boost::iostreams::filtering_istream in;
         in.push(boost::iostreams::gzip_decompressor()); // On-the-fly decompression
         in.push(ifs);
@@ -75,6 +76,7 @@ ORB_SLAM3::Atlas* load_atlas_from_file(const std::string &url, bool binary) {
         ia >> strFileVoc;
         ia >> strVocChecksum;
         ia >> atlas;
+        in.reset(); // Close the filtering stream to avoid dangling references
     }
     return atlas;
 }
@@ -87,14 +89,15 @@ void save_atlas_to_file(ORB_SLAM3::Atlas* atlas, const std::string &url, std::st
 
     std::string strVocChecksum = CalculateCheckSum(strVocFile); 
     atlas->PreSave();
-    std::ofstream ofs(url, std::ios::binary);
     if (binary) {
+        std::ofstream ofs(url, std::ios::binary);
         boost::archive::binary_oarchive oa(ofs);
         oa << strVocFile;
         oa << strVocChecksum;
         oa << atlas;
     } else {
         // 2. Set up the pipeline: Compression Filter -> File Output
+        std::ofstream ofs(url, std::ios::binary);
         boost::iostreams::filtering_ostream out;
         out.push(boost::iostreams::gzip_compressor()); // Intercepts and compresses text
         out.push(ofs);                                // Sends to dis
@@ -102,6 +105,7 @@ void save_atlas_to_file(ORB_SLAM3::Atlas* atlas, const std::string &url, std::st
         oa << strVocFile;
         oa << strVocChecksum;
         oa << atlas;
+        out.reset(); // Close the filtering stream to avoid dangling references
     }
 }
 

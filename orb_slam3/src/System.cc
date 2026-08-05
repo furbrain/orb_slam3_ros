@@ -1632,10 +1632,10 @@ bool System::SaveCOLMAP(const string &path)
   }
 
   // create cameras.txt
-  boost::filesystem::ofstream f_camera;
+  std::ofstream f_camera;
   const boost::filesystem::path camera_fname = pth / "sparse" / "cameras.txt";
   VerboseStream(Verbose::VERBOSITY_NORMAL) << "  Writing to " << camera_fname << std::endl;
-  f_camera.open(camera_fname);
+  f_camera.open(camera_fname.string());
   VerboseStream(Verbose::VERBOSITY_NORMAL) << "  file opened: " << camera_fname << std::endl;
 
   //std::vector<GeometricCamera*> cams = mpAtlas->GetAllCameras();
@@ -1644,10 +1644,10 @@ bool System::SaveCOLMAP(const string &path)
   f_camera.close();
 
   // create images.txt
-  boost::filesystem::ofstream f_images;
+  std::ofstream f_images;
   const boost::filesystem::path image_fname = pth / "sparse" / "images.txt";
   VerboseStream(Verbose::VERBOSITY_NORMAL) << "  Writing to " << image_fname << std::endl;
-  f_images.open(image_fname);
+  f_images.open(image_fname.string());
   VerboseStream(Verbose::VERBOSITY_NORMAL) << "  file opened: " << image_fname << std::endl;
 
   vector<KeyFrame*> vpKFs = pBiggerMap->GetAllKeyFrames();
@@ -1673,10 +1673,10 @@ bool System::SaveCOLMAP(const string &path)
   f_images.close();
 
   // create points3D.txt
-  boost::filesystem::ofstream f_points;
+  std::ofstream f_points;
   const boost::filesystem::path points_fname = pth / "sparse" / "points3D.txt";
   VerboseStream(Verbose::VERBOSITY_NORMAL) << "  Writing to " << points_fname << std::endl;
-  f_points.open(points_fname);
+  f_points.open(points_fname.string());
   VerboseStream(Verbose::VERBOSITY_NORMAL) << "  file opened: " << points_fname << std::endl;
 
   for (MapPoint* mp: allMapPoints)
