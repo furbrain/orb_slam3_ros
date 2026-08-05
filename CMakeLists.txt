@@ -178,6 +178,8 @@ target_link_libraries(${PROJECT_NAME}_lib
   -lboost_system
   -lboost_serialization
   -lboost_filesystem
+  -lboost_iostreams
+  -lz
   -lcrypto
 )
 

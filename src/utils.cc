@@ -3,6 +3,10 @@
 #include <openssl/md5.h>
 #include <boost/archive/binary_iarchive.hpp>
 #include <boost/archive/binary_oarchive.hpp>
+#include <boost/archive/text_iarchive.hpp>
+#include <boost/archive/text_oarchive.hpp>
+#include <boost/iostreams/filtering_stream.hpp>
+#include <boost/iostreams/filter/gzip.hpp>
 #include <boost/serialization/base_object.hpp>
 #include <boost/serialization/string.hpp>
 #include <ament_index_cpp/get_package_share_directory.hpp>
@@ -54,31 +58,53 @@ string CalculateCheckSum(string filename)
     return checksum;
 }
 
-ORB_SLAM3::Atlas* load_atlas_from_file(const std::string &url) {
+ORB_SLAM3::Atlas* load_atlas_from_file(const std::string &url, bool binary) {
     ORB_SLAM3::Atlas *atlas = new ORB_SLAM3::Atlas();
-    std::ifstream ifs(url, std::ios::binary);
-    boost::archive::binary_iarchive ia(ifs);
     std::string strFileVoc, strVocChecksum;
-    ia >> strFileVoc;
-    ia >> strVocChecksum;
-    ia >> atlas;
+    std::ifstream ifs(url, std::ios::binary);
+    if (binary) {
+        boost::archive::binary_iarchive ia(ifs);
+        ia >> strFileVoc;
+        ia >> strVocChecksum;
+        ia >> atlas;
+    } else {
+        boost::iostreams::filtering_istream in;
+        in.push(boost::iostreams::gzip_decompressor()); // On-the-fly decompression
+        in.push(ifs);
+        boost::archive::text_iarchive ia(in);
+        ia >> strFileVoc;
+        ia >> strVocChecksum;
+        ia >> atlas;
+    }
     return atlas;
 }
 
 
-void save_atlas_to_file(ORB_SLAM3::Atlas* atlas, const std::string &url, std::string strVocFile) {
-    std::ofstream ofs(url, std::ios::binary);
-    boost::archive::binary_oarchive oa(ofs);
+void save_atlas_to_file(ORB_SLAM3::Atlas* atlas, const std::string &url, std::string strVocFile, bool binary) {
     if (strVocFile.empty()) {
             strVocFile = ament_index_cpp::get_package_share_directory("orb_slam3") + "/vocab/ORBvoc.txt.bin";
     }
 
     std::string strVocChecksum = CalculateCheckSum(strVocFile); 
     atlas->PreSave();
-    oa << strVocFile;
-    oa << strVocChecksum;
-    oa << atlas;
+    std::ofstream ofs(url, std::ios::binary);
+    if (binary) {
+        boost::archive::binary_oarchive oa(ofs);
+        oa << strVocFile;
+        oa << strVocChecksum;
+        oa << atlas;
+    } else {
+        // 2. Set up the pipeline: Compression Filter -> File Output
+        boost::iostreams::filtering_ostream out;
+        out.push(boost::iostreams::gzip_compressor()); // Intercepts and compresses text
+        out.push(ofs);                                // Sends to dis
+        boost::archive::text_oarchive oa(out);
+        oa << strVocFile;
+        oa << strVocChecksum;
+        oa << atlas;
+    }
 }
+
 
 
 void alignMap(ORB_SLAM3::Map* map) {
@@ -122,7 +148,7 @@ void alignAtlas(ORB_SLAM3::Atlas* atlas) {
 }
 
 
-ORB_SLAM3::Atlas* prepare_atlas(std::string url, std::string strVocFile) {
+ORB_SLAM3::Atlas* prepare_atlas(std::string url, std::string strVocFile, bool binary) {
     auto vocab = new ORB_SLAM3::ORBVocabulary();
     if (strVocFile.empty()) {
             strVocFile = ament_index_cpp::get_package_share_directory("orb_slam3") + "/vocab/ORBvoc.txt.bin";
@@ -132,7 +158,7 @@ ORB_SLAM3::Atlas* prepare_atlas(std::string url, std::string strVocFile) {
         return nullptr;
     }
     auto mpKeyFrameDatabase = new ORB_SLAM3::KeyFrameDatabase(*vocab);
-    ORB_SLAM3::Atlas *atlas = load_atlas_from_file(url);
+    ORB_SLAM3::Atlas *atlas = load_atlas_from_file(url, binary);
     atlas->SetKeyFrameDababase(mpKeyFrameDatabase);
     atlas->SetORBVocabulary(vocab);
     atlas->PostLoad();

@@ -10,9 +10,9 @@ struct RansacResult {
     int numInliers = 0;
 };
 
-ORB_SLAM3::Atlas* load_atlas_from_file(const std::string &url);
-ORB_SLAM3::Atlas* prepare_atlas(std::string url, std::string strVocFile = "");
-void save_atlas_to_file(ORB_SLAM3::Atlas* atlas, const std::string &url, std::string strVocFile = "");
+ORB_SLAM3::Atlas* load_atlas_from_file(const std::string &url, bool binary = true);
+ORB_SLAM3::Atlas* prepare_atlas(std::string url, std::string strVocFile = "", bool binary = true);
+void save_atlas_to_file(ORB_SLAM3::Atlas* atlas, const std::string &url, std::string strVocFile = "", bool binary = true);
 vector<ORB_SLAM3::Map*> merge_atlas(ORB_SLAM3::Atlas* atlas, std::string url);
 ORB_SLAM3::Map* get_biggest_map(ORB_SLAM3::Atlas* atlas);
 void alignAtlas(ORB_SLAM3::Atlas* atlas);

@@ -9,11 +9,11 @@ using namespace ORB_SLAM3;
 
 void bind_utils(py::module &m) {
     m.def("load_atlas", &prepare_atlas,
-          py::arg("url"), py::arg("strVocFile") = "",
+          py::arg("url"), py::arg("strVocFile") = "", py::arg("binary") = true,
           py::return_value_policy::take_ownership,
           "Load an Atlas and rewire vocabulary/KeyFrameDatabase if strVocFile is given.");
     m.def("save_atlas", &save_atlas_to_file,
-          py::arg("atlas"), py::arg("url"), py::arg("strVocFile") = "",
+          py::arg("atlas"), py::arg("url"), py::arg("strVocFile") = "",  py::arg("binary") = true,
           "Save an Atlas to a file, along with the vocabulary file path and checksum.");
     m.def("merge_atlas", &merge_atlas,
           py::arg("atlas"), py::arg("url"),
