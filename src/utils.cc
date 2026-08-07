@@ -24,6 +24,66 @@
 
 ORB_SLAM3::ORBVocabulary *vocab = nullptr;
 
+class NanTextFilter : public boost::iostreams::output_filter {
+private:
+    std::string buffer_;
+    const std::string replacement_ = "4.321e+10"; // Matches standard text archive widths
+
+    // Check if the current buffered text contains a NaN string
+    bool check_and_replace() {
+        std::string lower = buffer_;
+        std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+        
+        // Handle common variations: "nan", "-nan", "+nan", "nan(ind)"
+        if (lower == "nan" || lower == "inf" || lower == "-nan" || lower == "-inf") {
+            buffer_ = replacement_;
+            return true;
+        }
+        return false;
+    }
+
+public:
+    template<typename Sink>
+    bool put(Sink& dest, char c) {
+        // Boost text_oarchive splits tokens using spaces, newlines, or tabs
+        if (c == ' ' || c == '\n' || c == '\t' || c == '\r') {
+            if (!buffer_.empty()) {
+                check_and_replace();
+                // Flush the altered or original buffer to the destination
+                for (char bc : buffer_) {
+                    if (!boost::iostreams::put(dest, bc)) return false;
+                }
+                buffer_.clear();
+            }
+            return boost::iostreams::put(dest, c);
+        } else {
+            // Collect the alphanumeric string token
+            buffer_ += c;
+            
+            // Safety fallback if it encounters an exceptionally long token
+            if (buffer_.size() > 16) {
+                for (char bc : buffer_) {
+                    if (!boost::iostreams::put(dest, bc)) return false;
+                }
+                buffer_.clear();
+            }
+            return true;
+        }
+    }
+
+    // Flush any remaining characters when the stream closes
+    template<typename Sink>
+    void close(Sink& dest) {
+        if (!buffer_.empty()) {
+            check_and_replace();
+            for (char bc : buffer_) {
+                boost::iostreams::put(dest, bc);
+            }
+            buffer_.clear();
+        }
+    }
+};
+
 string CalculateCheckSum(string filename)
 {
     string checksum = "";
@@ -68,14 +128,17 @@ ORB_SLAM3::Atlas* load_atlas_from_file(const std::string &url, bool binary) {
         ia >> strVocChecksum;
         ia >> atlas;
     } else {
-        std::ifstream ifs(url, std::ios::binary);
+        const std::size_t buffer_size = 32768; // 32 KB block look-ahead window
+        std::ifstream ifs(url);
         boost::iostreams::filtering_istream in;
-        in.push(boost::iostreams::gzip_decompressor()); // On-the-fly decompression
-        in.push(ifs);
-        boost::archive::text_iarchive ia(in);
-        ia >> strFileVoc;
-        ia >> strVocChecksum;
-        ia >> atlas;
+        in.push(boost::iostreams::gzip_decompressor(), buffer_size); // On-the-fly decompression
+        in.push(ifs, buffer_size);
+        {
+            boost::archive::text_iarchive ia(in);
+            ia >> strFileVoc;
+            ia >> strVocChecksum;
+            ia >> atlas;
+        }
         in.reset(); // Close the filtering stream to avoid dangling references
     }
     return atlas;
@@ -97,14 +160,17 @@ void save_atlas_to_file(ORB_SLAM3::Atlas* atlas, const std::string &url, std::st
         oa << atlas;
     } else {
         // 2. Set up the pipeline: Compression Filter -> File Output
-        std::ofstream ofs(url, std::ios::binary);
+        std::ofstream ofs(url);
         boost::iostreams::filtering_ostream out;
+        out.push(NanTextFilter()); // Intercepts and replaces NaN strings
         out.push(boost::iostreams::gzip_compressor()); // Intercepts and compresses text
         out.push(ofs);                                // Sends to dis
-        boost::archive::text_oarchive oa(out);
-        oa << strVocFile;
-        oa << strVocChecksum;
-        oa << atlas;
+        {
+            boost::archive::text_oarchive oa(out);
+            oa << strVocFile;
+            oa << strVocChecksum;
+            oa << atlas;
+        }
         out.reset(); // Close the filtering stream to avoid dangling references
     }
 }
