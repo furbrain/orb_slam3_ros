@@ -67,6 +67,9 @@ class Atlas
         ar & MapPoint::nNextId;
         ar & GeometricCamera::nNextId;
         ar & mnLastInitKFidMap;
+        if (version >=1) {
+            ar & mmvSurveys;
+        }
     }
 
 public:
@@ -173,5 +176,7 @@ protected:
 }; // class Atlas
 
 } // namespace ORB_SLAM3
+
+BOOST_CLASS_VERSION(ORB_SLAM3::Atlas, 1)
 
 #endif // ATLAS_H
