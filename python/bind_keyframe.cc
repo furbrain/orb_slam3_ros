@@ -35,17 +35,21 @@ void bind_keyframe(py::module &m) {
         .def("get_pose_inverse", [](KeyFrame &kf) {
             return to_rigid_transform(kf.GetPoseInverse());
         })
+        .def("set_pose", [](KeyFrame &kf, const py::object &pose) {
+            kf.SetPose(from_rigid_transform(pose));
+        }, py::arg("pose"))
         .def("get_camera_center", [](KeyFrame &kf) {
             return kf.GetCameraCenter(); // Eigen::Vector3f, native conversion
         })
         .def("get_imu_estimate", [](KeyFrame &kf) {
-            return to_rotation(kf.GetImuPoseEstimate());
+            return to_rigid_transform(kf.GetPoseFromEstimate());
         })
         .def("get_map_point_matches", [](KeyFrame &kf) {
             return kf.GetMapPointMatches(); // vector<MapPoint*>, nulls -> None
         }, py::return_value_policy::reference)
         .def("add_map_point", &KeyFrame::AddMapPoint, py::arg("mp"), py::arg("idx"))
         .def("erase_map_point",static_cast<void (KeyFrame::*)(MapPoint*)>(&KeyFrame::EraseMapPointMatch), py::arg("mp"))
+        .def("replace_map_point", &KeyFrame::ReplaceMapPointMatch, py::arg("idx"), py::arg("mp"))
         .def("get_connected_keyframes", &KeyFrame::GetConnectedKeyFrames,
              py::return_value_policy::reference)
         .def("get_covisibles_by_weight", &KeyFrame::GetCovisiblesByWeight,
@@ -72,6 +76,9 @@ void bind_keyframe(py::module &m) {
         .def("get_u_right", [](KeyFrame &kf) {
             return kf.mvuRight; // vector<float>
         })
+        .def("get_depth", [](KeyFrame &kf) {
+            return kf.mvDepth; // vector<float>
+        })
         .def("tlr", [](KeyFrame &kf) {
             return kf.GetRelativePoseTlr().matrix();
         })
@@ -90,6 +97,7 @@ void bind_keyframe(py::module &m) {
         .def_readonly("aruco_observations", &KeyFrame::mvArucoObservations)
         .def("add_aruco_observation", &KeyFrame::AddArucoObservation, py::arg("obs"))
         .def("clear_aruco_observations", &KeyFrame::ClearArucoObservations)
+        .def("update_connections", &KeyFrame::UpdateConnections)
         .def("__repr__", [](KeyFrame &kf) {
             return "<KeyFrame id=" + std::to_string(kf.mnId) + 
                    " timestamp=" + std::to_string(kf.mTimeStamp) + 

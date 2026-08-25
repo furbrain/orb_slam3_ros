@@ -280,10 +280,10 @@ install(FILES
   orb_slam3/Vocabulary/ORBvoc.txt.bin
   DESTINATION share/${PROJECT_NAME}/vocab)
   
-# PYTHON BINDINGS
+# PYTHON BINDINGSPYTHON
 
 
-set(PYTHON_INSTALL_DIR "lib/python3.11/site-packages")
+set(PYTHON_INSTALL_DIR "lib/python3.12/site-packages")
 
 pybind11_add_module(orb_slam3_py MODULE
   python/bindings.cc

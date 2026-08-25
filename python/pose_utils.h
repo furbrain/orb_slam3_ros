@@ -16,7 +16,7 @@ inline py::object to_rigid_transform(const Sophus::SE3f &pose) {
 inline py::object to_rotation(const Eigen::Quaternionf &pose) {
     static py::object Rotation =
         py::module_::import("scipy.spatial.transform").attr("Rotation");
-    return Rotation.attr("from_quaternion")(pose.cast<double>());
+    return Rotation.attr("from_matrix")(pose.toRotationMatrix().cast<double>());
 }
 
 inline Sophus::SE3f from_rigid_transform(const py::object &RT) {
