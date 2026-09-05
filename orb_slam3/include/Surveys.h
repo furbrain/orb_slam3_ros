@@ -48,6 +48,19 @@ struct Leg
           distance(_distance), azimuth(_azimuth), inclination(_inclination),
           distance_noise(_distance_noise), azimuth_noise(_azimuth_noise), inclination_noise(_inclination_noise),
           from_station(nullptr), to_station(nullptr) {}
+    
+    template<class Archive>
+    void serialize(Archive& ar, const unsigned int version)
+    {
+        ar & from_station_id;
+        ar & to_station_id;
+        ar & distance;
+        ar & azimuth;
+        ar & inclination;
+        ar & distance_noise;
+        ar & azimuth_noise;
+        ar & inclination_noise;
+    }
 };
 
 

@@ -67,6 +67,12 @@ void bind_keyframe(py::module &m) {
             for (auto &kp : kf.mvKeysUn) pts.emplace_back(kp.pt.x, kp.pt.y);
             return pts;
         })
+        .def("set_keypoint_at", [](KeyFrame &kf, size_t idx, float x, float y) {
+            if (idx >= kf.mvKeysUn.size()) throw std::out_of_range("Keypoint index out of range");
+            cv::KeyPoint* data = const_cast<cv::KeyPoint*>(kf.mvKeysUn.data());
+            data[idx].pt.x = x;
+            data[idx].pt.y = y;
+        }, py::arg("idx"), py::arg("x"), py::arg("y"))
         .def("get_descriptors", [](KeyFrame &kf) {
             // cv::Mat -> Eigen::Matrix<uint8_t, Dynamic, Dynamic>
             Eigen::Matrix<uint8_t, Eigen::Dynamic, Eigen::Dynamic> desc;
@@ -76,6 +82,11 @@ void bind_keyframe(py::module &m) {
         .def("get_u_right", [](KeyFrame &kf) {
             return kf.mvuRight; // vector<float>
         })
+        .def("set_u_right_at", [](KeyFrame &kf, size_t idx, float u_right) {
+            if (idx >= kf.mvuRight.size()) throw std::out_of_range("u_right index out of range");
+            float* data = const_cast<float*>(kf.mvuRight.data());
+            data[idx] = u_right;
+        }, py::arg("idx"), py::arg("u_right"))
         .def("get_depth", [](KeyFrame &kf) {
             return kf.mvDepth; // vector<float>
         })

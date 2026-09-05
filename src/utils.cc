@@ -128,7 +128,7 @@ ORB_SLAM3::Atlas* load_atlas_from_file(const std::string &url, bool binary) {
         ia >> strVocChecksum;
         ia >> atlas;
     } else {
-        const std::size_t buffer_size = 32768; // 32 KB block look-ahead window
+        const std::size_t buffer_size = 1 << 20; // 1 MB block look-ahead window
         std::ifstream ifs(url);
         boost::iostreams::filtering_istream in;
         in.push(boost::iostreams::gzip_decompressor(), buffer_size); // On-the-fly decompression
@@ -161,10 +161,10 @@ void save_atlas_to_file(ORB_SLAM3::Atlas* atlas, const std::string &url, std::st
     } else {
         // 2. Set up the pipeline: Compression Filter -> File Output
         std::ofstream ofs(url);
-        boost::iostreams::filtering_ostream out;
-        out.push(NanTextFilter()); // Intercepts and replaces NaN strings
-        out.push(boost::iostreams::gzip_compressor()); // Intercepts and compresses text
-        out.push(ofs);                                // Sends to dis
+        boost::iostreams::filtering_ostream out; // 1 Megabyte buffers
+        out.push(NanTextFilter(), 1 << 20); // Intercepts and replaces NaN strings
+        out.push(boost::iostreams::gzip_compressor(), 1 << 20); // Intercepts and compresses text
+        out.push(ofs, 1 << 20);                                // Sends to dis
         {
             boost::archive::text_oarchive oa(out);
             oa << strVocFile;
