@@ -43,5 +43,6 @@ void bind_atlas(py::module &m) {
         }, py::return_value_policy::reference)
         .def_readonly("surveys", &Atlas::mmvSurveys)
         .def("add_survey", &Atlas::AddSurvey, py::arg("dataset"), py::arg("legs"))
-        .def("clear_surveys", &Atlas::ClearSurveys);
+        .def("clear_surveys", &Atlas::ClearSurveys)
+        .def("add_station", &Atlas::AddStation, py::arg("dataset"), py::arg("station"));
 }

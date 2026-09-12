@@ -7,8 +7,12 @@ namespace py = pybind11;
 using namespace ORB_SLAM3;
 
 void bind_station(py::module &m) {
-    py::class_<Station>(m, "Station")
+    py::class_<Station, std::shared_ptr<Station>>(m, "Station")
         .def(py::init<>())
+        .def(py::init<const std::string&, const Eigen::Vector3f&>(), 
+            "Station constructor",
+            py::arg("id"), 
+            py::arg("position"))
         .def_readwrite("id", &Station::id)
         .def_readwrite("position", &Station::position)
         .def("__repr__", [](const Station &station) {
@@ -39,6 +43,8 @@ void bind_leg(py::module &m) {
         .def_readwrite("distance_noise", &Leg::distance_noise)
         .def_readwrite("azimuth_noise", &Leg::azimuth_noise)
         .def_readwrite("inclination_noise", &Leg::inclination_noise)
+        .def_readwrite("from_station", &Leg::from_station)
+        .def_readwrite("to_station", &Leg::to_station)
         .def("__repr__", [](const Leg &leg) {
             return "<Leg from_station_id='" + leg.from_station_id + 
                    "' to_station_id='" + leg.to_station_id + 

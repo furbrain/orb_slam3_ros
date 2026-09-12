@@ -151,6 +151,7 @@ public:
     
     void AddSurvey(int dataset, std::vector<Leg> &legs);
     void ClearSurveys();
+    void AddStation(int dataset, std::shared_ptr<Station> station);
 
 protected:
 

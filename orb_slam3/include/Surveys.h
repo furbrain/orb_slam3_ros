@@ -4,6 +4,8 @@
 #include <boost/serialization/array.hpp>
 #include <boost/serialization/map.hpp>
 #include <boost/serialization/serialization.hpp>
+#include <boost/serialization/shared_ptr.hpp>
+
 #include <string>
 
 namespace ORB_SLAM3
@@ -37,8 +39,8 @@ struct Leg
     float distance_noise;
     float azimuth_noise;
     float inclination_noise;
-    struct Station *from_station;
-    struct Station *to_station;
+    std::shared_ptr<Station> from_station;
+    std::shared_ptr<Station> to_station;
 
     Leg() = default;
     Leg(const std::string &_from_station_id, const std::string &_to_station_id,
@@ -60,8 +62,15 @@ struct Leg
         ar & distance_noise;
         ar & azimuth_noise;
         ar & inclination_noise;
+        if (version > 0) {
+            ar & from_station;
+            ar & to_station;
+        }
     }
 };
 
 
 } // namespace ORB_SLAM3
+
+
+BOOST_CLASS_VERSION(ORB_SLAM3::Leg, 1)

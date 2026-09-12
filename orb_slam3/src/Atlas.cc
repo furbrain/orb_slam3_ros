@@ -460,4 +460,16 @@ void Atlas::ClearSurveys()
     mmvSurveys.clear();
 }
 
+void Atlas::AddStation(int dataset, std::shared_ptr<Station> station)
+{
+    std::vector<Leg> &legs = mmvSurveys[dataset];
+    for(Leg &leg : legs)
+    {
+        if(leg.from_station_id == station->id)
+            leg.from_station = station;
+        if(leg.to_station_id == station->id)
+            leg.to_station = station;
+    }
+}
+
 } //namespace ORB_SLAM3
