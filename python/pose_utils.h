@@ -4,7 +4,15 @@
 #include <pybind11/eigen.h>
 #include <Eigen/Dense>
 #include "Thirdparty/Sophus/sophus/geometry.hpp"
+#include <pybind11/pybind11.h>
 
+// Check if the version is older than 2.6.0
+#if PYBIND11_VERSION_MAJOR < 2 || (PYBIND11_VERSION_MAJOR == 2 && PYBIND11_VERSION_MINOR < 6)
+namespace pybind11 {
+    // Create an alias so py::module_ works on older versions
+    using module_ = module;
+}
+#endif
 namespace py = pybind11;
 
 inline py::object to_rigid_transform(const Sophus::SE3f &pose) {

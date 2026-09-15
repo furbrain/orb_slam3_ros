@@ -5,6 +5,8 @@ IF(NOT CMAKE_BUILD_TYPE)
   SET(CMAKE_BUILD_TYPE Release)
 ENDIF()
 
+option(ENABLE_ROS2_FEATURES "Build full project with all ROS2 dependencies" ON)
+
 MESSAGE("Build type: " ${CMAKE_BUILD_TYPE})
 
 set(CMAKE_CXX_STANDARD 14)
@@ -24,26 +26,28 @@ endif()
 MESSAGE("OPENCV VERSION:")
 MESSAGE(${OpenCV_VERSION})
 find_package(Eigen3 3.1.0 REQUIRED)
+find_package(Boost REQUIRED)
 
 
 # ament stuff
-find_package(ament_cmake REQUIRED)
-find_package(Boost REQUIRED)
-find_package(cv_bridge REQUIRED)
-find_package(image_transport REQUIRED)
-find_package(nav_msgs REQUIRED)
-find_package(message_filters REQUIRED)
-find_package(rclcpp REQUIRED)
-find_package(rclpy REQUIRED)
-find_package(tf2 REQUIRED)
-find_package(tf2_ros REQUIRED)
-find_package(std_msgs REQUIRED)
-find_package(geometry_msgs REQUIRED)
-find_package(visualization_msgs REQUIRED)
-find_package(rosidl_default_generators REQUIRED)
-find_package(ament_index_cpp REQUIRED)
+if (ENABLE_ROS2_FEATURES)
+    find_package(ament_cmake REQUIRED)
+    find_package(cv_bridge REQUIRED)
+    find_package(image_transport REQUIRED)
+    find_package(nav_msgs REQUIRED)
+    find_package(message_filters REQUIRED)
+    find_package(rclcpp REQUIRED)
+    find_package(rclpy REQUIRED)
+    find_package(tf2 REQUIRED)
+    find_package(tf2_ros REQUIRED)
+    find_package(std_msgs REQUIRED)
+    find_package(geometry_msgs REQUIRED)
+    find_package(visualization_msgs REQUIRED)
+    find_package(rosidl_default_generators REQUIRED)
+    find_package(ament_index_cpp REQUIRED)
 
-find_package(ament_cmake_python REQUIRED)
+    find_package(ament_cmake_python REQUIRED)
+endif()
 find_package(pybind11 REQUIRED)
 
 set(ament_deps
@@ -83,15 +87,16 @@ set(msg_files
   msg/NumPoints.msg
   msg/State.msg
 )
+if (ENABLE_ROS2_FEATURES)
+    rosidl_generate_interfaces(${PROJECT_NAME}
+      ${msg_files}
+      ${srv_files}
+      DEPENDENCIES geometry_msgs std_msgs
+    )
 
-rosidl_generate_interfaces(${PROJECT_NAME}
-  ${msg_files}
-  ${srv_files}
-  DEPENDENCIES geometry_msgs std_msgs
-)
-
-ament_export_dependencies(Boost rclcpp rclpy std_msgs cv_bridge image_transport tf2 tf2_ros sensor_msgs rosidl_default_runtime)
-ament_export_libraries({PROJECT_NAME} libDBoW2 libg2o)
+    ament_export_dependencies(Boost rclcpp rclpy std_msgs cv_bridge image_transport tf2 tf2_ros sensor_msgs rosidl_default_runtime)
+    ament_export_libraries({PROJECT_NAME} libDBoW2 libg2o)
+endif()
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
@@ -183,98 +188,39 @@ target_link_libraries(${PROJECT_NAME}_lib
   -lcrypto
 )
 
-## ROS node
+if (ENABLE_ROS2_FEATURES)
+    foreach(tgt IN LISTS orb_targets)
+      add_executable(${tgt}
+        src/${tgt}.cc
+        src/common.cc
+      )
+      target_link_libraries(${tgt} ${PROJECT_NAME}_lib)
+      rosidl_target_interfaces(${tgt} ${PROJECT_NAME} "rosidl_typesupport_cpp")
+      ament_target_dependencies(${tgt} ${ament_deps})
+    endforeach()
 
-## ROS node
-#add_executable(ros_mono_inertial 
-#  src/ros_mono_inertial.cc
-#  src/common.cc
-#)
-#target_link_libraries(ros_mono_inertial 
-#  ${PROJECT_NAME}_lib
-#)
-#rosidl_target_interfaces(ros_mono_inertial
-#  ${PROJECT_NAME} "rosidl_typesupport_cpp")
-
-
-## ROS node
-#add_executable(ros_stereo 
-#  src/ros_stereo.cc
-#  src/common.cc
-#)
-#target_link_libraries(ros_stereo
-#  ${PROJECT_NAME}_lib
-#)
-#rosidl_target_interfaces(ros_stereo
-#  ${PROJECT_NAME} "rosidl_typesupport_cpp")
+    add_executable(process
+        src/process.cc
+        src/common.cc
+        src/utils.cc
+    )
+    target_link_libraries(process ${PROJECT_NAME}_lib)
+    rosidl_target_interfaces(process ${PROJECT_NAME} "rosidl_typesupport_cpp")
+    ament_target_dependencies(process ${ament_deps})
 
 
-## ROS node
-#add_executable(ros_stereo_inertial
-#  src/ros_stereo_inertial.cc
-#  src/common.cc
-#)
-#target_link_libraries(ros_stereo_inertial 
-#  ${PROJECT_NAME}_lib
-#)
-#rosidl_target_interfaces(ros_stereo_inertial
-#  ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
+    #ament_target_dependencies(ros_mono_inertial ${ament_deps})
+    #ament_target_dependencies(ros_stereo ${ament_deps})
+    #ament_target_dependencies(ros_stereo_inertial ${ament_deps})
+    #ament_target_dependencies(ros_rgbd ${ament_deps})
+    #ament_target_dependencies(ros_rgbd_inertial ${ament_deps})
 
-## ROS node
-#add_executable(ros_rgbd
-#  src/ros_rgbd.cc
-#  src/common.cc
-#)
-#target_link_libraries(ros_rgbd
-#  ${PROJECT_NAME}_lib
-#)
-#rosidl_target_interfaces(ros_rgbd
-#  ${PROJECT_NAME} "rosidl_typesupport_cpp")
-
-
-## ROS node
-#add_executable(ros_rgbd_inertial
-#  src/ros_rgbd_inertial.cc
-#  src/common.cc
-#)
-#target_link_libraries(ros_rgbd_inertial
-#  ${PROJECT_NAME}_lib
-#)
-#rosidl_target_interfaces(ros_rgbd_inertial
-#  ${PROJECT_NAME} "rosidl_typesupport_cpp")
-
-foreach(tgt IN LISTS orb_targets)
-  add_executable(${tgt}
-    src/${tgt}.cc
-    src/common.cc
-  )
-  target_link_libraries(${tgt} ${PROJECT_NAME}_lib)
-  rosidl_target_interfaces(${tgt} ${PROJECT_NAME} "rosidl_typesupport_cpp")
-  ament_target_dependencies(${tgt} ${ament_deps})  
-endforeach()
-
-add_executable(process
-    src/process.cc
-    src/common.cc
-    src/utils.cc
-)
-target_link_libraries(process ${PROJECT_NAME}_lib)
-rosidl_target_interfaces(process ${PROJECT_NAME} "rosidl_typesupport_cpp")
-ament_target_dependencies(process ${ament_deps})  
-    
-
-
-#ament_target_dependencies(ros_mono_inertial ${ament_deps})
-#ament_target_dependencies(ros_stereo ${ament_deps})
-#ament_target_dependencies(ros_stereo_inertial ${ament_deps})
-#ament_target_dependencies(ros_rgbd ${ament_deps})
-#ament_target_dependencies(ros_rgbd_inertial ${ament_deps})
-
-install(TARGETS
-  ${orb_targets}
-  process
-  DESTINATION lib/${PROJECT_NAME})
+    install(TARGETS
+      ${orb_targets}
+      process
+      DESTINATION lib/${PROJECT_NAME})
+endif()
 
 install(FILES
   orb_slam3/Vocabulary/ORBvoc.txt.bin
@@ -306,10 +252,16 @@ target_include_directories(orb_slam3_py PRIVATE
   ${EIGEN3_INCLUDE_DIR}
 )
 
-target_link_libraries(orb_slam3_py PRIVATE
-  ${PROJECT_NAME}_lib
-  ament_index_cpp::ament_index_cpp
-)
+if (ENABLE_ROS2_FEATURES)
+    target_link_libraries(orb_slam3_py PRIVATE
+      ${PROJECT_NAME}_lib
+      ament_index_cpp::ament_index_cpp
+    )
+else()
+    target_link_libraries(orb_slam3_py PRIVATE
+      ${PROJECT_NAME}_lib
+    )
+endif()
 
 install(TARGETS orb_slam3_py
   DESTINATION ${PYTHON_INSTALL_DIR}
@@ -326,4 +278,6 @@ install(FILES
   DESTINATION lib
 )
 
-ament_package()
+if (ENABLE_ROS2_FEATURES)
+    ament_package()
+endif()
