@@ -493,7 +493,7 @@ void Map::PostLoad(KeyFrameDatabase* pKFDB, ORBVocabulary* pORBVoc/*, map<long u
     mvpBackupMapPoints.clear();
 }
 
-void Map::OffsetIDs(long unsigned int mp_offset, long unsigned int kf_offset, long unsigned int map_offset)
+void Map::OffsetIDs(long unsigned int mp_offset, long unsigned int kf_offset, long unsigned int map_offset, long unsigned int dataset_offset)
 {
     mnId += map_offset;
     mnInitKFid += kf_offset;
@@ -513,7 +513,7 @@ void Map::OffsetIDs(long unsigned int mp_offset, long unsigned int kf_offset, lo
         if(!pKFi || pKFi->isBad())
             continue;
 
-        pKFi->OffsetId(kf_offset);
+        pKFi->OffsetId(kf_offset, dataset_offset);
     }
 }
 

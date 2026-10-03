@@ -131,7 +131,7 @@ public:
 
     void PreSave(std::set<GeometricCamera*> &spCams);
     void PostLoad(KeyFrameDatabase* pKFDB, ORBVocabulary* pORBVoc/*, map<long unsigned int, KeyFrame*>& mpKeyFrameId*/, map<unsigned int, GeometricCamera*> &mpCams);
-    void OffsetIDs(long unsigned int mp_offset, long unsigned int kf_offset, long unsigned int map_offset);
+    void OffsetIDs(long unsigned int mp_offset, long unsigned int kf_offset, long unsigned int map_offset, long unsigned int dataset_offset);
     void UpdateKFDatabase(KeyFrameDatabase* pKFDB);
 
     void printReprojectionError(list<KeyFrame*> &lpLocalWindowKFs, KeyFrame* mpCurrentKF, string &name, string &name_folder);

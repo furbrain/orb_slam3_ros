@@ -131,9 +131,10 @@ public:
     void OffsetIDs(long unsigned int mp_offset, 
         long unsigned int kf_offset, 
         long unsigned int map_offset, 
-        long unsigned int cam_offset);
+        long unsigned int cam_offset,
+        long unsigned int dataset_offset);
 
-    void ImportAtlas(Atlas* pAtlas);
+    int ImportAtlas(Atlas* pAtlas, bool share_surveys);
 
     map<long unsigned int, KeyFrame*> GetAtlasKeyframes();
 

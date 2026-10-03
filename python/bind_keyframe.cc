@@ -27,6 +27,7 @@ void bind_keyframe(py::module &m) {
         .def_readonly("baseline", &KeyFrame::mb)
         .def_readonly("bowVec", &KeyFrame::mBowVec)
         .def_readonly("featVec", &KeyFrame::mFeatVec)
+        .def_readonly("dataset", &KeyFrame::mnDataset)
         .def("get_pose", [](KeyFrame &kf) {
             // Sophus::SE3f -> 4x4 homogeneous matrix, pybind11/eigen.h
             // handles the Eigen::Matrix4f return automatically

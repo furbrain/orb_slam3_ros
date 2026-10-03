@@ -248,10 +248,7 @@ vector<ORB_SLAM3::Map*> merge_atlas(ORB_SLAM3::Atlas* atlas, std::string url) {
     new_atlas->PostLoad();
     new_atlas->PreSave();
     auto new_maps = new_atlas->GetAllMaps();
-    for(ORB_SLAM3::Map* map : new_maps) {
-        alignMap(map);
-    }
-    atlas->ImportAtlas(new_atlas);
+    atlas->ImportAtlas(new_atlas, false);
     return new_maps;
 }
 

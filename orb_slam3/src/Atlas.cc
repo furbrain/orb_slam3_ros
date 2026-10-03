@@ -16,6 +16,8 @@
 * If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <boost/algorithm/string/predicate.hpp>
+
 #include "Atlas.h"
 
 #include "GeometricCamera.h"
@@ -299,6 +301,7 @@ bool Atlas::isImuInitialized()
 
 void Atlas::PreSave()
 {
+    mvpBackupMaps.clear();
     if(mpCurrentMap){
         if(!mspMaps.empty() && mnLastInitKFidMap < mpCurrentMap->GetMaxKFid())
             mnLastInitKFidMap = mpCurrentMap->GetMaxKFid()+1; //The init KF is the next of current maximum
@@ -350,23 +353,33 @@ void Atlas::PostLoad()
     mvpBackupMaps.clear();
 }
 
-void Atlas::OffsetIDs(long unsigned int mp_offset, long unsigned int kf_offset, long unsigned int map_offset, long unsigned int cam_offset)
+void Atlas::OffsetIDs(long unsigned int mp_offset, 
+    long unsigned int kf_offset, 
+    long unsigned int map_offset, 
+    long unsigned int cam_offset, 
+    long unsigned int dataset_offset)
 {
     for(Map* pMi : mspMaps)
     {
-        pMi->OffsetIDs(mp_offset, kf_offset, map_offset);
+        pMi->OffsetIDs(mp_offset, kf_offset, map_offset, dataset_offset);
     }
 
     for(GeometricCamera* pCam : mvpCameras)
     {
         pCam->OffsetId(cam_offset);
     }
+
+    std::map<int, std::vector<Leg> > new_surveys;
+    for (const auto& kv : mmvSurveys) {
+        new_surveys.emplace(kv.first + dataset_offset, kv.second);
+    }
+    mmvSurveys = new_surveys;
 }
 
-void Atlas::ImportAtlas(Atlas* pAtlas)
+int Atlas::ImportAtlas(Atlas* pAtlas, bool share_surveys)
 {
     // get id offsets
-    unsigned long int max_kf_id = 0, max_cam_id = 0, max_mp_id = 0, max_map_id = 0;
+    unsigned long int max_kf_id = 0, max_cam_id = 0, max_mp_id = 0, max_map_id = 0, max_dataset_id = 0;
     for (Map* map : mspMaps) {
         for (KeyFrame* kf : map->GetAllKeyFrames()) {
             if (kf->mnId > max_kf_id) max_kf_id = kf->mnId;
@@ -379,8 +392,18 @@ void Atlas::ImportAtlas(Atlas* pAtlas)
     for (GeometricCamera* cam : mvpCameras) {
         if (cam->GetId() > max_cam_id) max_cam_id = cam->GetId();
     }
+    if (!share_surveys) { // if share_surveys is true, we will not offset the dataset ids, so we don't need to compute the max_dataset_id
+        for (const auto& survey_pair : mmvSurveys) {
+            if (survey_pair.first > max_dataset_id) max_dataset_id = survey_pair.first;
+        }
+        max_dataset_id++; // offset by 1 to avoid conflicts
+    }
+    max_kf_id++;
+    max_mp_id++;
+    max_map_id++;
+    max_cam_id++;
         // apply id offsets
-    pAtlas->OffsetIDs(max_mp_id + 1, max_kf_id + 1, max_map_id + 1, max_cam_id + 1);
+    pAtlas->OffsetIDs(max_mp_id, max_kf_id, max_map_id, max_cam_id, max_dataset_id);
     for(Map* pMap_i : pAtlas->GetAllMaps())
     {
         pMap_i->UpdateKFDatabase(GetKeyFrameDatabase());
@@ -390,6 +413,11 @@ void Atlas::ImportAtlas(Atlas* pAtlas)
     {
         AddCamera(pCam_i);
     }
+    for (const auto& survey_pair : pAtlas->mmvSurveys) {
+        mmvSurveys[survey_pair.first] = survey_pair.second;
+    }
+    pAtlas->mspMaps.clear();
+    return max_kf_id; // return the offset applied to the keyframe ids, so that the caller can update its references accordingly    
 }
 
 void Atlas::SetKeyFrameDababase(KeyFrameDatabase* pKFDB)
@@ -465,9 +493,9 @@ void Atlas::AddStation(int dataset, std::shared_ptr<Station> station)
     std::vector<Leg> &legs = mmvSurveys[dataset];
     for(Leg &leg : legs)
     {
-        if(leg.from_station_id == station->id)
+        if(boost::algorithm::iequals(leg.from_station_id, station->id))
             leg.from_station = station;
-        if(leg.to_station_id == station->id)
+        if(boost::algorithm::iequals(leg.to_station_id, station->id))
             leg.to_station = station;
     }
 }
