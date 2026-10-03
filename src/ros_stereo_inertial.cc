@@ -41,6 +41,7 @@ int main(int argc, char **argv)
     auto node = init(argc, argv, "Stereo_Inertion", ORB_SLAM3::System::IMU_STEREO);
     if (node==NULL) return 1;
     std::string node_name = node->get_name();
+    create_image_output();
 
     ImuGrabber imugb;
     ImageGrabber igb(&imugb);
@@ -182,6 +183,13 @@ void ImageGrabber::SyncWithImu()
                 publish_atlas(pSLAM->GetAtlas(), msg_time);
                 publish_kf(imLeft, msg_time);
                 publish_kf_right(imRight, msg_time);
+                int last_kf_id = pSLAM->GetLastKeyFrameId();
+                std::tuple<cv::Mat, cv::Mat> images = pSLAM->GetCurrentImages();           
+                char fname[32];
+                std::snprintf(fname, sizeof fname, "%06d.jpg", last_kf_id);
+                write_image_to_stream(std::get<0>(images), fname);
+                std::snprintf(fname, sizeof fname, "%06dr.jpg", last_kf_id);
+                write_image_to_stream(std::get<1>(images), fname);
             }
             std::chrono::milliseconds tSleep(1);
             std::this_thread::sleep_for(tSleep);

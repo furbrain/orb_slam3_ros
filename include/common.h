@@ -37,6 +37,7 @@
 #include <orb_slam3/srv/save_map.hpp> // This file is created automatically, see here http://wiki.ros.org/ROS/Tutorials/CreatingMsgAndSrv#Creating_a_srv
 #include <orb_slam3/msg/atlas.hpp> // This file is created automatically, see here http://wiki.ros.org/ROS/Tutorials/CreatingMsgAndSrv#Creating_a_srv
 
+
 // ORB-SLAM3-specific libraries
 #include "System.h"
 #include "ImuTypes.h"
@@ -46,7 +47,6 @@ extern ORB_SLAM3::System* pSLAM;
 extern ORB_SLAM3::System::eSensor sensor_type;
 
 extern std::string world_frame_id, cam_frame_id, imu_frame_id;
-
 extern rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_pub;
 extern rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub;
 extern rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr kf_markers_pub;
@@ -80,4 +80,6 @@ geometry_msgs::msg::Transform SE3f_to_tfTransform(Sophus::SE3f);
 sensor_msgs::msg::PointCloud2 mappoint_to_pointcloud(std::vector<ORB_SLAM3::MapPoint*>, rclcpp::Time);
 
 rclcpp::Node::SharedPtr init(int argc, char **argv, std::string name, ORB_SLAM3::System::eSensor sensor);
+void create_image_output();
+void write_image_to_stream(const cv::Mat &image, const char* image_name);
 void run(rclcpp::Node::SharedPtr node);

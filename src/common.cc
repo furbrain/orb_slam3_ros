@@ -6,9 +6,13 @@
  */
 #include "common.h"
 #include "System.h"
+
 #include <orb_slam3/msg/atlas.hpp> // This file is created automatically, see here http://wiki.ros.org/ROS/Tutorials/CreatingMsgAndSrv#Creating_a_srv
 #include <orb_slam3/msg/num_points.hpp>
 #include <orb_slam3/msg/state.hpp>
+#include <tar_to_stream.h>
+#include <boost/filesystem.hpp>
+
 
 // Variables for ORB-SLAM3
 ORB_SLAM3::System *pSLAM;
@@ -28,6 +32,7 @@ rclcpp::Publisher<orb_slam3::msg::NumPoints>::SharedPtr num_points_pub;
 rclcpp::Publisher<orb_slam3::msg::State>::SharedPtr state_pub;
 image_transport::Publisher tracking_img_pub, kf_pub, kf_pub_right;
 std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster;
+std::ofstream image_stream;
 
 //////////////////////////////////////////////////
 // Main functions
@@ -638,15 +643,41 @@ rclcpp::Node::SharedPtr init(int argc, char **argv, std::string name,
   return node;
 }
 
+void create_image_output() {
+  boost::filesystem::path images_path(pSLAM->GetSaveAtlasFileName());
+    // Replace the last component
+  images_path.replace_filename("images.tar");
+  if (!images_path.empty()) {
+    image_stream.open(images_path.string(), std::ios::out | std::ios::binary);
+  }
+}
+
+void write_image_to_stream(const cv::Mat &image, const char* image_name) {
+
+  if (image_stream.is_open()) {
+    std::vector<uchar> jpeg;
+    if (!cv::imencode(".jpg", image, jpeg))
+      throw std::runtime_error{"cv::imencode failed"};
+    tar_write_file(image_stream, image_name,
+                  reinterpret_cast<char const *>(jpeg.data()), jpeg.size());
+  }
+}
+
+void close_image_output() {
+  if (image_stream.is_open()) {
+    tar_write_tail(image_stream);
+    image_stream.close();
+  }
+}
+
 void run(rclcpp::Node::SharedPtr node) {
   auto logger = node->get_logger();
   RCLCPP_INFO(logger, "Spinning");
   rclcpp::spin(node);
-  RCLCPP_INFO(logger, "Finished spin");
 
   // Stop all threads
   pSLAM->Shutdown();
-  RCLCPP_INFO(logger, "mid shutdwon");
+  close_image_output();
+  RCLCPP_INFO(logger, "Shutting down");
   rclcpp::shutdown();
-  RCLCPP_INFO(logger, "can this work?");
 }

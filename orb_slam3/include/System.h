@@ -157,6 +157,9 @@ public:
     bool GetLastFrameIsKF();
     Atlas* GetAtlas();
 
+    std::tuple<cv::Mat, cv::Mat> GetCurrentImages();
+    int GetLastKeyFrameId();
+
     Sophus::SE3f GetCamTwc();
     Sophus::SE3f GetImuTwb();
     Eigen::Vector3f GetImuVwb();
@@ -170,6 +173,8 @@ public:
     void ChangeDataset();
 
     float GetImageScale();
+
+    string GetSaveAtlasFileName();
 
 #ifdef REGISTER_TIMES
     void InsertRectTime(double& time);
@@ -245,6 +250,9 @@ private:
     string mStrVocabularyFilePath;
 
     Settings* settings_;
+
+    cv::Mat imLeftToFeed;
+    cv::Mat imRightToFeed;
 
 };
 

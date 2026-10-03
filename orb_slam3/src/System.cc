@@ -218,7 +218,6 @@ Sophus::SE3f System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, 
         exit(-1);
     }
 
-    cv::Mat imLeftToFeed, imRightToFeed;
     if(settings_ && settings_->needToRectify()){
         cv::Mat M1l = settings_->M1l();
         cv::Mat M2l = settings_->M2l();
@@ -1594,6 +1593,21 @@ vector<Sophus::SE3f> System::GetAllKeyframePoses()
 Atlas* System::GetAtlas()
 {
     return mpAtlas;
+}
+
+int System::GetLastKeyFrameId()
+{
+    return mpTracker->GetLastKeyFrame()->mnId;
+}
+
+std::tuple<cv::Mat, cv::Mat> System::GetCurrentImages()
+{
+    return std::make_tuple(imLeftToFeed, imRightToFeed);
+}
+
+std::string System::GetSaveAtlasFileName()
+{
+    return mStrSaveAtlasToFile;
 }
 
 bool System::SaveMap(const string &filename)
