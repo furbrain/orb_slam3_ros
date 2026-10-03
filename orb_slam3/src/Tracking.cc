@@ -42,6 +42,7 @@ using namespace std;
 
 namespace ORB_SLAM3 {
 
+const bool new_mode = true;
 
 Tracking::Tracking(System *pSys, ORBVocabulary *pVoc, FrameDrawer *pFrameDrawer,
                    Atlas *pAtlas, KeyFrameDatabase *pKFDB,
@@ -3012,10 +3013,11 @@ bool Tracking::TrackLocalMap() {
   // Decide if the tracking was succesful
   // More restrictive if there was a relocalization recently
   mpLocalMapper->mnMatchesInliers = mnMatchesInliers;
+  int match_count =  new_mode ? 15 : 20;
   if (mCurrentFrame.mnId < mnLastRelocFrameId + mMaxFrames &&
-      mnMatchesInliers < 20) {
+      mnMatchesInliers < match_count) {
     Verbose::PrintMess(
-        "TrackLocalMap: Too few inliers (<20), recent relocalization: " +
+        "TrackLocalMap: Too few inliers (<" + to_string(match_count) + "), recent relocalization: " +
             to_string(mnMatchesInliers),
         Verbose::VERBOSITY_NORMAL);
     return false;
@@ -3628,14 +3630,24 @@ bool Tracking::Relocalization() {
   Verbose::PrintMess("Starting relocalization", Verbose::VERBOSITY_NORMAL);
   // Compute Bag of Words Vector
   mCurrentFrame.ComputeBoW();
-
+  vector<KeyFrame *> vpCandidateKFs;
   // Relocalization is performed when tracking is lost
   // Track Lost: Query KeyFrame Database for keyframe candidates for
   // relocalisation
-  vector<KeyFrame *> vpCandidateKFs =
-      mpKeyFrameDB->DetectRelocalizationCandidates(&mCurrentFrame,
-                                                   mpAtlas->GetCurrentMap());
-
+  if (new_mode) {
+    // get the most recent keyframes to use as candidates, max 5, spread out over the last 20 keyframes
+    vector<KeyFrame *> vpKFs = mpAtlas->GetCurrentMap()->GetAllKeyFrames();
+    std::sort(vpKFs.begin(), vpKFs.end(), [](const KeyFrame* a, const KeyFrame* b) {
+      return a->mTimeStamp < b->mTimeStamp;
+    });
+    for (int i = vpKFs.size() - 1; i >= 0; i -= 4) {
+      vpCandidateKFs.push_back(vpKFs[i]);
+      if (vpCandidateKFs.size() > 4)
+        break;
+    }
+  } else {
+    vpCandidateKFs = mpKeyFrameDB->DetectRelocalizationCandidates(&mCurrentFrame, mpAtlas->GetCurrentMap());
+  }
   if (vpCandidateKFs.empty()) {
     Verbose::PrintMess("There are not candidates", Verbose::VERBOSITY_NORMAL);
     return false;

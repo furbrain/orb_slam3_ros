@@ -132,6 +132,7 @@ class KeyFrame
         // BOW
         ar & mBowVec;
         ar & mFeatVec;
+    
         // Pose relative to parent
         serializeSophusSE3<Archive>(ar, mTcp, version);
         // Scale
@@ -181,6 +182,7 @@ class KeyFrame
         ar & const_cast<int&>(NRight);
         serializeSophusSE3<Archive>(ar, mTlr, version);
         serializeVectorKeyPoints<Archive>(ar, mvKeysRight, version);
+    
         ar & mGridRight;
 
         // Inertial variables

@@ -53,8 +53,8 @@ class Map
         //ar & mspKeyFrames;
         //ar & mspMapPoints;
         ar & mvpBackupKeyFrames;
+    
         ar & mvpBackupMapPoints;
-
         ar & mvBackupKeyFrameOriginsId;
 
         ar & mnBackupKFinitialID;
