@@ -86,6 +86,7 @@ set(msg_files
   msg/Point3D.msg
   msg/NumPoints.msg
   msg/State.msg
+  msg/KeyframeStamped.msg
 )
 if (ENABLE_ROS2_FEATURES)
     rosidl_generate_interfaces(${PROJECT_NAME}

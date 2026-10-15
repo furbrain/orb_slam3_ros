@@ -69,6 +69,7 @@ void publish_body_odom(Sophus::SE3f, Eigen::Vector3f, Eigen::Vector3f, rclcpp::T
 void publish_kf_markers(std::vector<Sophus::SE3f>, rclcpp::Time);
 void publish_kf(cv::Mat, rclcpp::Time);
 void publish_kf_right(cv::Mat, rclcpp::Time);
+void publish_kf_stamp(int id, rclcpp::Time msg_time);
 orb_slam3::msg::Atlas create_atlas_msg(ORB_SLAM3::Atlas *atlas, rclcpp::Time msg_time, std::string frame_id);
 void publish_atlas(ORB_SLAM3::Atlas*, rclcpp::Time);
 

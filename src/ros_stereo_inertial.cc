@@ -180,10 +180,11 @@ void ImageGrabber::SyncWithImu()
             publish_topics(msg_time, Wbb);
             if (pSLAM->GetLastFrameIsKF()) 
             {
-                publish_atlas(pSLAM->GetAtlas(), msg_time);
-                publish_kf(imLeft, msg_time);
-                publish_kf_right(imRight, msg_time);
+                //publish_atlas(pSLAM->GetAtlas(), msg_time);
+                //publish_kf(imLeft, msg_time);
+                //publish_kf_right(imRight, msg_time);
                 int last_kf_id = pSLAM->GetLastKeyFrameId();
+                publish_kf_stamp(last_kf_id, msg_time);
                 std::tuple<cv::Mat, cv::Mat> images = pSLAM->GetCurrentImages();           
                 char fname[32];
                 std::snprintf(fname, sizeof fname, "%06d.jpg", last_kf_id);

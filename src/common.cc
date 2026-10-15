@@ -10,6 +10,7 @@
 #include <orb_slam3/msg/atlas.hpp> // This file is created automatically, see here http://wiki.ros.org/ROS/Tutorials/CreatingMsgAndSrv#Creating_a_srv
 #include <orb_slam3/msg/num_points.hpp>
 #include <orb_slam3/msg/state.hpp>
+#include <orb_slam3/msg/keyframe_stamped.hpp>
 #include <tar_to_stream.h>
 #include <boost/filesystem.hpp>
 
@@ -30,6 +31,7 @@ rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr
 rclcpp::Publisher<orb_slam3::msg::Atlas>::SharedPtr atlas_pub;
 rclcpp::Publisher<orb_slam3::msg::NumPoints>::SharedPtr num_points_pub;
 rclcpp::Publisher<orb_slam3::msg::State>::SharedPtr state_pub;
+rclcpp::Publisher<orb_slam3::msg::KeyframeStamped>::SharedPtr kf_stamp_pub;
 image_transport::Publisher tracking_img_pub, kf_pub, kf_pub_right;
 std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster;
 std::ofstream image_stream;
@@ -131,6 +133,9 @@ void setup_publishers(rclcpp::Node::SharedPtr node, std::string node_name) {
 
   atlas_pub =
       node->create_publisher<orb_slam3::msg::Atlas>(node_name + "/atlas", 3);
+
+  kf_stamp_pub =
+      node->create_publisher<orb_slam3::msg::KeyframeStamped>(node_name + "/kf_stamp", 3);
 
   if (sensor_type == ORB_SLAM3::System::IMU_MONOCULAR ||
       sensor_type == ORB_SLAM3::System::IMU_STEREO ||
@@ -381,6 +386,16 @@ void publish_kf_right(cv::Mat image, rclcpp::Time msg_time) {
   const sensor_msgs::msg::Image::SharedPtr rendered_image_msg =
       cv_bridge::CvImage(header, "bgr8", image).toImageMsg();
   kf_pub_right.publish(rendered_image_msg);
+}
+
+void publish_kf_stamp(int id, rclcpp::Time msg_time) {
+  std_msgs::msg::Header header;
+  header.stamp = msg_time;
+  header.frame_id = world_frame_id;
+  orb_slam3::msg::KeyframeStamped msg;
+  msg.header = header;
+  msg.keyframe_id = id;
+  kf_stamp_pub->publish(msg);
 }
 
 // void extract_keypoints(vector<orb_slam3::msg::Point3D> points, ORB_SLAM3::KeyFrame *pKF, bool left) {
@@ -646,7 +661,7 @@ rclcpp::Node::SharedPtr init(int argc, char **argv, std::string name,
 void create_image_output() {
   boost::filesystem::path images_path(pSLAM->GetSaveAtlasFileName());
     // Replace the last component
-  images_path.replace_filename("images.tar");
+  images_path.remove_filename().append("images.tar");
   if (!images_path.empty()) {
     image_stream.open(images_path.string(), std::ios::out | std::ios::binary);
   }
