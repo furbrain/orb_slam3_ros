@@ -195,6 +195,16 @@ Sophus::SE3f KeyFrame::GetPoseFromEstimate() const
     return Tcw;
 }
 
+float KeyFrame::GetImuOrientationErrorDeg()
+{
+    if (mfImuPoseNoise < 0.0f)
+        return -1.0f;
+    const Eigen::Matrix3f Rwb_meas = Eigen::Matrix3f(mImuPoseEstimate.normalized());
+    const Eigen::Matrix3f Rwb_slam = GetImuRotation();
+    const Eigen::Vector3f err = Sophus::SO3f(Rwb_meas.transpose() * Rwb_slam).log();
+    return err.norm() * 180.0f / static_cast<float>(M_PI);
+}
+
 Eigen::Matrix3f KeyFrame::GetRotation(){
     unique_lock<mutex> lock(mMutexPose);
     return mRcw;

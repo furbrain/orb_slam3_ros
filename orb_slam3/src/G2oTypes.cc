@@ -906,6 +906,12 @@ void EdgeSE3ExpMapOrientationPrior::computeError()
     Eigen::Quaterniond q_err = q_meas.conjugate() * q_est;
     q_err.normalize();
 
+    // q and -q are the same rotation. Take the short way round, otherwise
+    // w < 0 makes the log return ~2*pi minus the true error and the prior
+    // pushes the estimate away from the measurement.
+    if (q_err.w() < 0.0)
+        q_err.coeffs() *= -1.0;
+
     // Convert quaternion error → minimal 3-vector (axis-angle log)
     // g2o helper: internal::toVectorMQ()
     Eigen::Vector3d err = LogSO3(q_err);

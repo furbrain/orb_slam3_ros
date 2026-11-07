@@ -153,6 +153,9 @@ void LocalMapping::Run()
                     {
                         Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame,&mbAbortBA, mpCurrentKeyFrame->GetMap(),num_FixedKF_BA,num_OptKF_BA,num_MPs_BA,num_edges_BA);
                         b_doneLBA = true;
+                        if (mpCurrentKeyFrame->GetImuPoseNoise() >= 0.0f)
+                            VerboseStream(Verbose::VERBOSITY_NORMAL) << "IMU orientation: KF " << mpCurrentKeyFrame->mnId
+                                << " post-LBA error " << mpCurrentKeyFrame->GetImuOrientationErrorDeg() << " deg" << std::endl;
                     }
 
                 }

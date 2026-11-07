@@ -227,6 +227,9 @@ public:
     void SetImuPoseNoise(const float noise);
     float GetImuPoseNoise();
     Sophus::SE3f GetPoseFromEstimate() const;
+    // Angle (degrees) between the keyframe's IMU rotation and the IMU
+    // orientation measurement, or -1 if there is no orientation prior.
+    float GetImuOrientationErrorDeg();
 
     Eigen::Matrix3f GetRotation();
     Eigen::Vector3f GetTranslation();

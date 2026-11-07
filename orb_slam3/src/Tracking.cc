@@ -3225,6 +3225,13 @@ void Tracking::CreateNewKeyFrame() {
     pKF->bImu = true;
 
   pKF->SetNewBias(mCurrentFrame.mImuBias);
+
+  if (pKF->GetImuPoseNoise() >= 0.0f) {
+    VerboseStream(Verbose::VERBOSITY_NORMAL)
+        << "IMU orientation: KF " << pKF->mnId << " tracked error "
+        << pKF->GetImuOrientationErrorDeg() << " deg, measured Rcw quat w "
+        << pKF->GetPoseFromEstimate().unit_quaternion().w() << std::endl;
+  }
   mpReferenceKF = pKF;
   mCurrentFrame.mpReferenceKF = pKF;
 
